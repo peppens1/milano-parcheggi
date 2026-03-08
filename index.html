@@ -453,16 +453,31 @@
   const noticeBox = document.getElementById('noticeBox');
   const planBox = document.getElementById('planBox');
   const savedBanner = document.getElementById('savedBanner');
+  const searchInput = document.getElementById('searchInput');
+  const searchBtn = document.getElementById('searchBtn');
+  const locateBtn = document.getElementById('locateBtn');
 
   let currentArea = null;
   let myMarker = null;
   let myCircle = null;
   let savedCarMarker = null;
+  let destinationMarker = null;
+  let searchCircle = null;
 
-  const areaIndex = {};
   const group = L.featureGroup().addTo(map);
 
-  function setSheet(area, mode = 'manual') {
+  function showBanner(text, persistent = false) {
+    savedBanner.style.display = 'block';
+    savedBanner.textContent = text;
+    if (!persistent) {
+      clearTimeout(showBanner._timeout);
+      showBanner._timeout = setTimeout(() => {
+        savedBanner.style.display = 'none';
+      }, 3500);
+    }
+  }
+
+  function setSheet(area, mode = 'manual', extra = '') {
     currentArea = area;
     zoneTitle.textContent = area.name;
     zoneBadge.textContent = area.badge;
@@ -470,9 +485,26 @@
     zoneText.textContent = area.rules;
     parkingType.textContent = area.parkingType;
     strategyText.textContent = area.strategy;
-    noticeBox.textContent = area.tip + (mode === 'gps' ? ' Sei dentro o vicino a questa zona demo.' : '');
+    noticeBox.textContent = area.tip + (mode === 'gps' ? ' Sei dentro o vicino a questa zona demo.' : '') + (extra ? ' ' + extra : '');
     planBox.innerHTML = `<strong>Come la userei io</strong>${area.plan}`;
     planBox.classList.remove('hidden');
+  }
+
+  function setCustomResult(title, subtitle, strategy, note, planHtml = '') {
+    currentArea = null;
+    zoneTitle.textContent = title;
+    zoneBadge.textContent = 'ricerca';
+    zoneBadge.className = 'pill pill-gray';
+    zoneText.textContent = subtitle;
+    parkingType.textContent = 'indirizzo';
+    strategyText.textContent = strategy;
+    noticeBox.textContent = note;
+    if (planHtml) {
+      planBox.innerHTML = `<strong>Come la userei io</strong>${planHtml}`;
+      planBox.classList.remove('hidden');
+    } else {
+      planBox.classList.add('hidden');
+    }
   }
 
   function setWelcome() {
@@ -487,12 +519,11 @@
   }
 
   function saveCar() {
-    if (!myMarker) {
-      savedBanner.style.display = 'block';
-      savedBanner.textContent = 'Prima usa GPS o scegli una zona.';
+    const latlng = myMarker ? myMarker.getLatLng() : (destinationMarker ? destinationMarker.getLatLng() : null);
+    if (!latlng) {
+      showBanner('Prima usa GPS o cerca una destinazione.');
       return;
     }
-    const latlng = myMarker.getLatLng();
     localStorage.setItem('milanoParcheggiCar', JSON.stringify({
       lat: latlng.lat,
       lng: latlng.lng,
@@ -500,8 +531,7 @@
       savedAt: new Date().toISOString()
     }));
     renderSavedCar();
-    savedBanner.style.display = 'block';
-    savedBanner.textContent = 'Posizione auto salvata sul dispositivo.';
+    showBanner('Posizione auto salvata sul dispositivo.');
   }
 
   function renderSavedCar() {
@@ -516,15 +546,13 @@
   function goToCar() {
     const raw = localStorage.getItem('milanoParcheggiCar');
     if (!raw) {
-      savedBanner.style.display = 'block';
-      savedBanner.textContent = 'Non hai ancora salvato la posizione dell’auto.';
+      showBanner('Non hai ancora salvato la posizione dell’auto.');
       return;
     }
     const data = JSON.parse(raw);
     map.setView([data.lat, data.lng], 16);
     if (savedCarMarker) savedCarMarker.openPopup();
-    savedBanner.style.display = 'block';
-    savedBanner.textContent = 'Ti ho riportato al punto in cui hai salvato l’auto.';
+    showBanner('Ti ho riportato al punto in cui hai salvato l’auto.');
   }
 
   function findAreaByText(text) {
@@ -537,8 +565,98 @@
     return areas.find(a => L.polygon(a.coords).getBounds().contains(latlng)) || null;
   }
 
+  function findNearestArea(latlng) {
+    let nearest = null;
+    let best = Infinity;
+    areas.forEach(area => {
+      const dist = map.distance(latlng, L.latLng(area.center[0], area.center[1]));
+      if (dist < best) {
+        best = dist;
+        nearest = area;
+      }
+    });
+    return { area: nearest, distance: best };
+  }
+
+  async function searchRealAddress() {
+    const query = searchInput.value.trim();
+    if (!query) {
+      showBanner('Scrivi un indirizzo o una zona.');
+      return;
+    }
+
+    const localArea = findAreaByText(query);
+    if (localArea) {
+      setSheet(localArea);
+      map.setView(localArea.center, 14);
+      return;
+    }
+
+    searchBtn.disabled = true;
+    searchBtn.textContent = '...';
+
+    try {
+      const normalized = /milano/i.test(query) ? query : `${query}, Milano, Italia`;
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(normalized)}`;
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('network');
+      const results = await response.json();
+      if (!results.length) {
+        setCustomResult(
+          'Indirizzo non trovato',
+          'Non ho trovato risultati utili per questa ricerca.',
+          'prova indirizzo completo',
+          'Scrivi via e numero civico, ad esempio “Via Torino 32, Milano”.'
+        );
+        return;
+      }
+
+      const result = results[0];
+      const latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
+      map.setView(latlng, 16);
+
+      if (destinationMarker) map.removeLayer(destinationMarker);
+      if (searchCircle) map.removeLayer(searchCircle);
+
+      destinationMarker = L.marker(latlng).addTo(map).bindPopup(result.display_name).openPopup();
+      searchCircle = L.circle(latlng, { radius: 180, weight: 1, fillOpacity: 0.08 }).addTo(map);
+
+      const containing = findContainingArea(latlng);
+      if (containing) {
+        setSheet(containing, 'manual', 'La destinazione cercata cade dentro questa zona demo.');
+      } else {
+        const nearest = findNearestArea(latlng);
+        setCustomResult(
+          'Destinazione trovata',
+          result.display_name,
+          nearest.area ? `zona vicina: ${nearest.area.name}` : 'destinazione trovata',
+          nearest.area
+            ? `Questa destinazione non è dentro una zona demo, ma la zona campione più vicina è ${nearest.area.name} a circa ${Math.round(nearest.distance)} m.`
+            : 'Destinazione trovata, ma non ho ancora abbastanza aree per collegarla bene.',
+          nearest.area
+            ? `Se dovessi partire ora, aprirei come prima candidata <strong>${nearest.area.name}</strong> e preparerei almeno una seconda area vicina.`
+            : 'Quando allargheremo il dataset, qui compariranno suggerimenti reali per le vie migliori da provare.'
+        );
+      }
+    } catch (error) {
+      setCustomResult(
+        'Ricerca temporaneamente non disponibile',
+        'Il servizio di geocoding non ha risposto.',
+        'riprovare',
+        'Controlla la connessione o riprova tra poco. La logica della webapp è pronta; questa parte usa un servizio online.'
+      );
+    } finally {
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Vai';
+    }
+  }
+
   areas.forEach(area => {
-    areaIndex[area.id] = area;
     const polygon = L.polygon(area.coords, {
       color: area.color,
       fillColor: area.color,
@@ -556,25 +674,15 @@
   const bounds = group.getBounds();
   map.fitBounds(bounds.pad(0.15));
 
-  document.getElementById('searchBtn').addEventListener('click', () => {
-    const value = document.getElementById('searchInput').value;
-    const area = findAreaByText(value);
-    if (!area) {
-      zoneTitle.textContent = 'Zona non trovata';
-      zoneBadge.textContent = 'ricerca';
-      zoneBadge.className = 'pill pill-gray';
-      zoneText.textContent = 'Nel prototipo la ricerca funziona solo su alcune zone demo. Nella versione vera useremo ricerca per indirizzo e aree vicine.';
-      parkingType.textContent = '—';
-      strategyText.textContent = 'ampliare dataset';
-      noticeBox.textContent = 'Questo è il punto dove aggiungeremo geocoding, dati ATM e suggerimenti di parcheggio.';
-      planBox.classList.add('hidden');
-      return;
+  searchBtn.addEventListener('click', searchRealAddress);
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      searchRealAddress();
     }
-    setSheet(area);
-    map.setView(area.center, 14);
   });
 
-  document.getElementById('locateBtn').addEventListener('click', () => {
+  locateBtn.addEventListener('click', () => {
     if (!window.isSecureContext && location.hostname !== 'localhost') {
       zoneTitle.textContent = 'GPS bloccato';
       zoneBadge.textContent = 'https richiesto';
@@ -602,14 +710,23 @@
         if (hit) {
           setSheet(hit, 'gps');
         } else {
-          zoneTitle.textContent = 'Posizione rilevata';
-          zoneBadge.textContent = 'fuori demo';
-          zoneBadge.className = 'pill pill-gray';
-          zoneText.textContent = 'La tua posizione è stata trovata, ma sei fuori dalle zone demo del prototipo.';
-          parkingType.textContent = '—';
-          strategyText.textContent = 'estendere Milano';
-          noticeBox.textContent = 'Nella versione vera ci saranno tutte le aree utili di Milano e la logica completa per lo studio della destinazione.';
-          planBox.classList.add('hidden');
+          const nearest = findNearestArea(latlng);
+          if (nearest.area) {
+            setCustomResult(
+              'Posizione rilevata',
+              'Sei fuori dalle zone demo del prototipo.',
+              `più vicina: ${nearest.area.name}`,
+              `La zona demo più vicina è ${nearest.area.name} a circa ${Math.round(nearest.distance)} m.`,
+              'Quando estenderemo il dataset a tutta Milano, qui vedrai subito l’ambito corretto e i consigli di parcheggio reali.'
+            );
+          } else {
+            setCustomResult(
+              'Posizione rilevata',
+              'Sei fuori dalle zone demo del prototipo.',
+              'estendere Milano',
+              'Nella versione vera ci saranno tutte le aree utili di Milano e la logica completa per lo studio della destinazione.'
+            );
+          }
         }
       },
       err => {
@@ -636,12 +753,10 @@
   document.getElementById('fitZonesBtn').addEventListener('click', () => map.fitBounds(bounds.pad(0.15)));
   document.getElementById('studyBtn').addEventListener('click', () => {
     if (!currentArea) {
-      savedBanner.style.display = 'block';
-      savedBanner.textContent = 'Prima seleziona una zona.';
+      showBanner('Prima seleziona una zona o cerca una destinazione.');
       return;
     }
-    savedBanner.style.display = 'block';
-    savedBanner.textContent = `Zona in studio: ${currentArea.name}. Questa è la funzione che evolveremo per cercare le vie migliori prima di partire.`;
+    showBanner(`Zona in studio: ${currentArea.name}. Questa è la funzione che evolveremo per cercare le vie migliori prima di partire.`);
   });
 
   renderSavedCar();
