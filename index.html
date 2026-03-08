@@ -582,61 +582,105 @@
     recommendationsBox.classList.remove('hidden');
   }
 
-  async function searchRealAddress() {
-    const query = searchInput.value.trim();
-    if (!query) {
-      showBanner('Scrivi un indirizzo o una zona.');
-      return;
-    }
-    searchBtn.disabled = true;
-    searchBtn.textContent = '...';
-    try {
-      const candidates = /milano/i.test(query) ? [query, query.trim()] : [`${query}, Milano, Italia`, `${query}, Milano`, query];
-      let result = null;
-      for (const candidate of candidates) {
-        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&countrycodes=it&q=${encodeURIComponent(candidate)}`;
-        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-        if (!response.ok) continue;
-        const results = await response.json();
-        if (!results.length) continue;
-        const milanoResults = results.filter(r => /milano/i.test(r.display_name || ''));
-        const pool = milanoResults.length ? milanoResults : results;
-        result = pool.find(r => ['house','residential','road','pedestrian','street','place'].includes(r.type)) || pool[0];
-        if (result) break;
-      }
-      if (!result) {
-        setCustomResult('Indirizzo non trovato', 'Non ho trovato risultati utili per questa ricerca.', '—', 'Scrivi via e numero civico, ad esempio “Via Torino 32, Milano”.');
-        hideRecommendations();
-        hideAtmBox();
-        return;
-      }
-      const latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
-      map.setView(latlng, 15);
-      if (destinationMarker) map.removeLayer(destinationMarker);
-      if (searchCircle) map.removeLayer(searchCircle);
-      destinationMarker = L.marker(latlng).addTo(map).bindPopup(result.display_name).openPopup();
-      searchCircle = L.circle(latlng, { radius: 180, weight: 1, fillOpacity: 0.08 }).addTo(map);
+async function searchRealAddress() {
+  const query = searchInput.value.trim();
+  if (!query) {
+    showBanner('Scrivi un indirizzo o una zona.');
+    return;
+  }
 
-      const atm = classifyATM(latlng);
-      const recommendations = getTopRecommendations(latlng, 3);
-      renderRecommendations(recommendations, latlng);
-      renderAtmProfiles(atm.profileKeys);
-      setCustomResult(
-        'Destinazione trovata',
-        result.display_name,
-        atm.macro,
-        `${atm.note} Ti mostro anche le tariffe ATM ufficiali compatibili con questa macro-area e 3 aree strategiche vicine.`,
-        recommendations[0]?.area ? `Se dovessi partire ora, confronterei prima <strong>${recommendations[0].area.name}</strong>, poi le altre due opzioni.` : ''
+  searchBtn.disabled = true;
+  searchBtn.textContent = '...';
+
+  try {
+    const normalized = /milano/i.test(query)
+      ? query
+      : `${query}, Milano, Italia`;
+
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&countrycodes=it&viewbox=9.05,45.545,9.31,45.401&bounded=1&q=${encodeURIComponent(normalized)}`;
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error('network');
+    }
+
+    const results = await response.json();
+
+    const milanoOnly = results.filter(r => {
+      const display = (r.display_name || '').toLowerCase();
+      const city =
+        (r.address?.city || r.address?.town || r.address?.village || r.address?.municipality || '').toLowerCase();
+      const county = (r.address?.county || '').toLowerCase();
+      const state = (r.address?.state || '').toLowerCase();
+
+      return (
+        display.includes('milano') ||
+        city === 'milano' ||
+        county.includes('milano') ||
+        state.includes('lombardia')
       );
-    } catch (error) {
-      setCustomResult('Ricerca temporaneamente non disponibile', 'Il servizio di geocoding non ha risposto.', '—', 'Controlla la connessione o riprova tra poco.');
+    });
+
+    const pool = milanoOnly.length ? milanoOnly : results;
+
+    const result =
+      pool.find(r => ['house', 'building'].includes(r.type)) ||
+      pool.find(r => ['residential', 'road', 'pedestrian', 'street'].includes(r.type)) ||
+      pool[0];
+
+    if (!result) {
+      setCustomResult(
+        'Indirizzo non trovato',
+        'Non ho trovato risultati utili dentro Milano.',
+        '—',
+        'Prova con via + numero civico, ad esempio “Via Gomes 4”.'
+      );
       hideRecommendations();
       hideAtmBox();
-    } finally {
-      searchBtn.disabled = false;
-      searchBtn.textContent = 'Vai';
+      return;
     }
+
+    const latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
+    map.setView(latlng, 16);
+
+    if (destinationMarker) map.removeLayer(destinationMarker);
+    if (searchCircle) map.removeLayer(searchCircle);
+
+    destinationMarker = L.marker(latlng).addTo(map).bindPopup(result.display_name).openPopup();
+    searchCircle = L.circle(latlng, { radius: 180, weight: 1, fillOpacity: 0.08 }).addTo(map);
+
+    const atm = classifyATM(latlng);
+    const recommendations = getTopRecommendations(latlng, 3);
+
+    renderRecommendations(recommendations, latlng);
+    renderAtmProfiles(atm.profileKeys);
+
+    setCustomResult(
+      'Destinazione trovata',
+      result.display_name,
+      atm.macro,
+      `${atm.note} Ti mostro anche le tariffe ATM ufficiali compatibili con questa macro-area e 3 aree strategiche vicine.`,
+      recommendations[0]?.area
+        ? `Se dovessi partire ora, confronterei prima <strong>${recommendations[0].area.name}</strong>, poi le altre due opzioni.`
+        : ''
+    );
+  } catch (error) {
+    setCustomResult(
+      'Ricerca temporaneamente non disponibile',
+      'Il servizio di geocoding non ha risposto.',
+      '—',
+      'Controlla la connessione o riprova tra poco.'
+    );
+    hideRecommendations();
+    hideAtmBox();
+  } finally {
+    searchBtn.disabled = false;
+    searchBtn.textContent = 'Vai';
   }
+}
 
   function handleGpsPosition(latlng, accuracy = 40) {
     map.setView(latlng, 15);
