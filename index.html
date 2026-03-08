@@ -128,6 +128,12 @@
       padding: 14px;
       max-height: 52vh;
       overflow: auto;
+      transition: max-height 0.22s ease, transform 0.22s ease;
+    }
+
+    .sheetCard.collapsed {
+      max-height: 92px;
+      overflow: hidden;
     }
 
     .grabber {
@@ -136,6 +142,29 @@
       border-radius: 999px;
       background: #cbd5e1;
       margin: 0 auto 12px;
+      cursor: pointer;
+    }
+
+    .sheetHeaderRow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .sheetToggle {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .sheetBody.hiddenBody {
+      display: none;
     }
 
     .sectionTitle {
@@ -295,6 +324,15 @@
       </div>
       <button id="locateBtn" class="btn-soft">GPS</button>
     </div>
+    <div class="searchRow" style="grid-template-columns: 1fr;">
+      <div class="searchWrap" style="grid-template-columns: 1fr; padding:10px 12px;">
+        <select id="strategySelect" style="width:100%; border:0; outline:none; background:transparent; color:var(--text); font-size:15px; padding:6px 2px;">
+          <option value="equilibrato">Strategia: Equilibrato</option>
+          <option value="vicino">Strategia: Vicino alla destinazione</option>
+          <option value="facile">Strategia: Parcheggio facile</option>
+        </select>
+      </div>
+    </div>
     <datalist id="presetAreas">
       <option value="Duomo"></option>
       <option value="Cadorna"></option>
@@ -313,8 +351,13 @@
   </div>
 
   <div class="sheet">
-    <div class="sheetCard">
-      <div class="grabber"></div>
+    <div id="sheetCard" class="sheetCard">
+      <div id="sheetGrabber" class="grabber"></div>
+      <div class="sheetHeaderRow">
+        <div class="muted" style="font-size:12px; font-weight:700;">Pannello zona</div>
+        <button id="sheetToggleBtn" class="sheetToggle">Riduci</button>
+      </div>
+      <div id="sheetBody" class="sheetBody">
       <div class="sectionTitle">
         <h2 id="zoneTitle">Benvenuto</h2>
         <span id="zoneBadge" class="pill pill-gray">demo</span>
@@ -341,6 +384,7 @@
       <div id="planBox" class="planCard hidden"></div>
       <div id="recommendationsBox" class="recommendations hidden"></div>
       <div id="savedBanner" class="savedBanner"></div>
+      </div>
     </div>
   </div>
 
@@ -355,6 +399,8 @@
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
   const areas = [
+    // difficulty: 1 facile, 2 media, 3 difficile
+    // transitBonus: 1 scarso, 2 buono, 3 ottimo per parcheggio + mezzi
     {
       id: 'duomo',
       aliases: ['duomo', 'centro'],
@@ -368,7 +414,9 @@
       coords: [[45.4690,9.1835],[45.4690,9.1995],[45.4590,9.1995],[45.4590,9.1835]],
       rules: 'Zona centrale. Domanda molto alta. Adatta soprattutto per pianificare in anticipo e scegliere vie di bordo.',
       tip: 'Evita di puntare al cuore della zona. Meglio preparare due alternative già prima di partire.',
-      plan: 'Per il centro conviene arrivare con 2-3 aree candidate e tenere un piano B vicino a una fermata metro.'
+      plan: 'Per il centro conviene arrivare con 2-3 aree candidate e tenere un piano B vicino a una fermata metro.',
+      difficulty: 3,
+      transitBonus: 2
     },
     {
       id: 'cadorna',
@@ -383,7 +431,9 @@
       coords: [[45.4750,9.1710],[45.4750,9.1875],[45.4650,9.1875],[45.4650,9.1710]],
       rules: 'Zona valida per destinazioni centrali senza spingersi troppo dentro il centro storico.',
       tip: 'Studia prima le vie laterali: la prima strada utile spesso non è quella più vicina alla destinazione.',
-      plan: 'Buona zona se vuoi combinare auto + tratto finale a piedi.'
+      plan: 'Buona zona se vuoi combinare auto + tratto finale a piedi.',
+      difficulty: 2,
+      transitBonus: 2
     },
     {
       id: 'centrale',
@@ -398,7 +448,9 @@
       coords: [[45.4915,9.1940],[45.4915,9.2145],[45.4795,9.2145],[45.4795,9.1940]],
       rules: 'Area intensa, con traffico e ricambio alto. Conviene pianificare bene prima di entrare nella zona.',
       tip: 'Perfetta per la funzione futura “dove provo prima”.',
-      plan: 'Prima di partire scegli una via prioritaria e due vie alternative entro 5-8 minuti a piedi.'
+      plan: 'Prima di partire scegli una via prioritaria e due vie alternative entro 5-8 minuti a piedi.',
+      difficulty: 3,
+      transitBonus: 2
     },
     {
       id: 'navigli',
@@ -413,7 +465,9 @@
       coords: [[45.4585,9.1620],[45.4585,9.1815],[45.4465,9.1815],[45.4465,9.1620]],
       rules: 'Utile per uscite serali e destinazioni vivaci. Qui la preparazione in anticipo conta molto.',
       tip: 'Se arrivi in orari critici, valuta anche zone un po’ più lontane ma meno tese.',
-      plan: 'App ideale: confrontare 3 strade vicine e salvare la migliore prima di muoverti.'
+      plan: 'App ideale: confrontare 3 strade vicine e salvare la migliore prima di muoverti.',
+      difficulty: 3,
+      transitBonus: 2
     },
     {
       id: 'sansiro',
@@ -428,7 +482,9 @@
       coords: [[45.4855,9.1110],[45.4855,9.1390],[45.4695,9.1390],[45.4695,9.1110]],
       rules: 'Area molto interessante per lasciare l’auto e poi entrare in città con i mezzi.',
       tip: 'Ideale quando non vuoi stressarti con il centro.',
-      plan: 'Candidata perfetta per una futura funzione “zone consigliate”.'
+      plan: 'Candidata perfetta per una futura funzione “zone consigliate”.',
+      difficulty: 1,
+      transitBonus: 3
     },
     {
       id: 'bicocca',
@@ -443,7 +499,9 @@
       coords: [[45.5205,9.1965],[45.5205,9.2265],[45.5035,9.2265],[45.5035,9.1965]],
       rules: 'Area spesso più gestibile rispetto al centro, utile per destinazioni a nord-est.',
       tip: 'Ottima per ragionare in anticipo prima di uno spostamento.',
-      plan: 'Buona per sperimentare la logica “parcheggio comodo + ultimo tratto con mezzi”.'
+      plan: 'Buona per sperimentare la logica “parcheggio comodo + ultimo tratto con mezzi”.',
+      difficulty: 1,
+      transitBonus: 3
     },
     {
       id: 'portaromana',
@@ -458,7 +516,9 @@
       coords: [[45.4605,9.1935],[45.4605,9.2115],[45.4445,9.2115],[45.4445,9.1935]],
       rules: 'Buon equilibrio tra accesso e distanza dal centro. Da leggere con calma prima di andare.',
       tip: 'Meglio non fissarsi sulla via esatta della destinazione.',
-      plan: 'Conviene cercare nelle laterali con una passeggiata finale breve.'
+      plan: 'Conviene cercare nelle laterali con una passeggiata finale breve.',
+      difficulty: 2,
+      transitBonus: 2
     },
     {
       id: 'loreto',
@@ -473,7 +533,9 @@
       coords: [[45.4890,9.1995],[45.4890,9.2165],[45.4785,9.2165],[45.4785,9.1995]],
       rules: 'Area molto intensa. Perfetta per testare la logica della webapp orientata alla scelta anticipata.',
       tip: 'Qui sarà utilissima la futura vista per singola via.',
-      plan: 'Prima di partire confronta almeno due micro-zone ai lati della destinazione principale.'
+      plan: 'Prima di partire confronta almeno due micro-zone ai lati della destinazione principale.',
+      difficulty: 3,
+      transitBonus: 2
     },
     {
       id: 'residenti-demo',
@@ -488,7 +550,9 @@
       coords: [[45.4745,9.1565],[45.4745,9.1655],[45.4685,9.1655],[45.4685,9.1565]],
       rules: 'Area demo per mostrare come la futura app segnalerà le zone residenti o riservate.',
       tip: 'L’obiettivo vero è evitare errori, non solo vedere la mappa.',
-      plan: 'Nella versione completa questa scheda mostrerà chiaramente perché una via non è consigliata.'
+      plan: 'Nella versione completa questa scheda mostrerà chiaramente perché una via non è consigliata.',
+      difficulty: 3,
+      transitBonus: 1
     }
   ];
 
@@ -500,10 +564,15 @@
   const noticeBox = document.getElementById('noticeBox');
   const planBox = document.getElementById('planBox');
   const recommendationsBox = document.getElementById('recommendationsBox');
+  const sheetCard = document.getElementById('sheetCard');
+  const sheetBody = document.getElementById('sheetBody');
+  const sheetToggleBtn = document.getElementById('sheetToggleBtn');
+  const sheetGrabber = document.getElementById('sheetGrabber');
   const savedBanner = document.getElementById('savedBanner');
   const searchInput = document.getElementById('searchInput');
   const searchBtn = document.getElementById('searchBtn');
   const locateBtn = document.getElementById('locateBtn');
+  const strategySelect = document.getElementById('strategySelect');
 
   let currentArea = null;
   let myMarker = null;
@@ -513,6 +582,19 @@
   let searchCircle = null;
 
   const group = L.featureGroup().addTo(map);
+
+  let sheetCollapsed = false;
+
+  function setSheetCollapsed(collapsed) {
+    sheetCollapsed = collapsed;
+    sheetCard.classList.toggle('collapsed', collapsed);
+    sheetBody.classList.toggle('hiddenBody', collapsed);
+    sheetToggleBtn.textContent = collapsed ? 'Apri' : 'Riduci';
+  }
+
+  function toggleSheet() {
+    setSheetCollapsed(!sheetCollapsed);
+  }
 
   function showBanner(text, persistent = false) {
     savedBanner.style.display = 'block';
@@ -538,6 +620,7 @@
 
     recommendationsBox.innerHTML = '';
     const labels = ['Prima scelta', 'Alternativa', 'Piano B'];
+    const strategyMode = strategySelect.value;
 
     items.forEach((item, index) => {
       const card = document.createElement('div');
@@ -551,6 +634,7 @@
           <span class="recTag">${labels[index] || 'Opzione'}</span>
         </div>
         <div class="recMeta"><strong>Strategia:</strong> ${item.area.strategy}</div>
+        <div class="recMeta"><strong>Modalità attiva:</strong> ${strategyMode}</div>
         <div class="recMeta">${item.area.tip}</div>
       `;
 
@@ -568,13 +652,34 @@
     recommendationsBox.classList.remove('hidden');
   }
 
+  function getRecommendationScore(area, distance, mode) {
+    const difficultyPenalty = area.difficulty || 2;
+    const transitBonus = area.transitBonus || 2;
+
+    if (mode === 'vicino') {
+      return distance + (difficultyPenalty * 220) - (transitBonus * 40);
+    }
+
+    if (mode === 'facile') {
+      return distance * 0.65 + (difficultyPenalty * 520) - (transitBonus * 180);
+    }
+
+    // equilibrato
+    return distance * 0.85 + (difficultyPenalty * 320) - (transitBonus * 110);
+  }
+
   function getTopRecommendations(latlng, limit = 3) {
+    const mode = strategySelect.value;
     return areas
-      .map(area => ({
-        area,
-        distance: map.distance(latlng, L.latLng(area.center[0], area.center[1]))
-      }))
-      .sort((a, b) => a.distance - b.distance)
+      .map(area => {
+        const distance = map.distance(latlng, L.latLng(area.center[0], area.center[1]));
+        return {
+          area,
+          distance,
+          score: getRecommendationScore(area, distance, mode)
+        };
+      })
+      .sort((a, b) => a.score - b.score)
       .slice(0, limit);
   }
 
@@ -906,7 +1011,18 @@
       showBanner('Prima seleziona una zona o cerca una destinazione.');
       return;
     }
-    showBanner(`Zona in studio: ${currentArea.name}. Questa è la funzione che evolveremo per cercare le vie migliori prima di partire.`);
+    showBanner(`Zona in studio: ${currentArea.name}. Modalità attiva: ${strategySelect.value}. Questa è la funzione che evolveremo per cercare le vie migliori prima di partire.`);
+  });
+
+  sheetToggleBtn.addEventListener('click', toggleSheet);
+  sheetGrabber.addEventListener('click', toggleSheet);
+
+  strategySelect.addEventListener('change', () => {
+    const latlng = destinationMarker ? destinationMarker.getLatLng() : (myMarker ? myMarker.getLatLng() : null);
+    if (!latlng) return;
+    const recommendations = getTopRecommendations(latlng, 3);
+    renderRecommendations(recommendations, latlng);
+    showBanner(`Strategia aggiornata: ${strategySelect.value}.`);
   });
 
   renderSavedCar();
