@@ -224,6 +224,8 @@
       display: none;
     }
 
+    .hidden { display: none; }
+
     .leaflet-popup-content { font-size: 14px; }
 
     @media (min-width: 900px) {
@@ -558,7 +560,18 @@
   function findAreaByText(text) {
     const q = text.trim().toLowerCase();
     if (!q) return null;
-    return areas.find(area => area.name.toLowerCase().includes(q) || area.aliases.some(a => a.includes(q) || q.includes(a))) || null;
+
+    const addressPattern = new RegExp('(via|viale|piazza|piazzale|corso|largo|vicolo|naviglio|alzaia)', 'i');
+    const looksLikeAddress = /\d/.test(q) || addressPattern.test(q) || q.includes(',');
+
+    if (looksLikeAddress) return null;
+
+    return areas.find(area =>
+      area.name.toLowerCase() === q ||
+      area.aliases.some(a => a === q) ||
+      area.name.toLowerCase().includes(q) ||
+      area.aliases.some(a => a.includes(q) || q.includes(a))
+    ) || null;
   }
 
   function findContainingArea(latlng) {
@@ -596,27 +609,52 @@
     searchBtn.textContent = '...';
 
     try {
-      const normalized = /milano/i.test(query) ? query : `${query}, Milano, Italia`;
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(normalized)}`;
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
+      const candidates = [];
+      const q = query.trim();
 
-      if (!response.ok) throw new Error('network');
-      const results = await response.json();
-      if (!results.length) {
+      if (/milano/i.test(q)) {
+        candidates.push(q);
+      } else {
+        candidates.push(`${q}, Milano, Italia`);
+        candidates.push(`${q}, Milano`);
+      }
+      candidates.push(q);
+
+      let result = null;
+
+      for (const candidate of candidates) {
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&countrycodes=it&q=${encodeURIComponent(candidate)}`;
+        const response = await fetch(url, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) continue;
+        const results = await response.json();
+        if (!results.length) continue;
+
+        const milanoResults = results.filter(r => /milano/i.test(r.display_name || ''));
+        const pool = milanoResults.length ? milanoResults : results;
+
+        result =
+          pool.find(r => ['house', 'residential', 'road', 'pedestrian', 'street', 'place'].includes(r.type)) ||
+          pool.find(r => ['building', 'amenity', 'railway'].includes(r.type)) ||
+          pool[0];
+
+        if (result) break;
+      }
+
+      if (!result) {
         setCustomResult(
           'Indirizzo non trovato',
           'Non ho trovato risultati utili per questa ricerca.',
           'prova indirizzo completo',
-          'Scrivi via e numero civico, ad esempio “Via Torino 32, Milano”.'
+          'Scrivi via e numero civico, ad esempio “Via Torino 32, Milano”, oppure una zona come “Navigli”.'
         );
         return;
       }
 
-      const result = results[0];
       const latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
       map.setView(latlng, 16);
 
