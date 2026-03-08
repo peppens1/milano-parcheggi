@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Milano Parcheggi · Webapp</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <style>
+    :root {
+      --bg: #e2e8f0;
+      --card: rgba(255,255,255,0.96);
+      --text: #0f172a;
+      --muted: #475569;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --yellow: #ca8a04;
+      --yellow-soft: #fef3c7;
+      --danger: #dc2626;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    body { overflow: hidden; }
+    #map { position: fixed; inset: 0; }
+
+    .topbar {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 22px;
+      background: rgba(15, 23, 42, 0.9);
+      color: white;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .title { font-size: 18px; font-weight: 800; line-height: 1.1; }
+    .subtitle { font-size: 13px; color: rgba(255,255,255,0.82); }
+
+    .searchRow {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .searchWrap {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      background: rgba(255,255,255,0.96);
+      border-radius: 16px;
+      padding: 8px;
+    }
+
+    input {
+      width: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 15px;
+      padding: 8px 6px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: white;
+      color: var(--text);
+    }
+
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-soft { background: rgba(255,255,255,0.16); color: white; }
+    .btn-small { padding: 9px 12px; }
+
+    .fabStack {
+      position: fixed;
+      right: 12px;
+      bottom: 220px;
+      z-index: 1000;
+      display: grid;
+      gap: 10px;
+    }
+
+    .fab {
+      width: 52px;
+      height: 52px;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      background: white;
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+    }
+
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000;
+      padding: 10px 10px 16px;
+      background: linear-gradient(to top, rgba(226,232,240,1), rgba(226,232,240,0.88) 70%, rgba(226,232,240,0));
+      pointer-events: none;
+    }
+
+    .sheetCard {
+      pointer-events: auto;
+      background: var(--card);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      max-height: 44vh;
+      overflow: auto;
+    }
+
+    .grabber {
+      width: 44px;
+      height: 5px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      margin: 0 auto 12px;
+    }
+
+    .sectionTitle {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 8px;
+    }
+
+    .sectionTitle h2 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .pill-blue { background: var(--blue-soft); color: #1d4ed8; }
+    .pill-green { background: var(--green-soft); color: #166534; }
+    .pill-yellow { background: var(--yellow-soft); color: #92400e; }
+    .pill-gray { background: #e2e8f0; color: #334155; }
+
+    .muted { color: var(--muted); font-size: 14px; line-height: 1.35; }
+    .infoGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .miniCard {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 10px;
+    }
+
+    .miniLabel { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .miniValue { font-size: 14px; font-weight: 700; }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .notice {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .planCard {
+      margin-top: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      background: #f8fafc;
+      padding: 12px;
+    }
+
+    .planCard strong { display: block; margin-bottom: 6px; }
+
+    .savedBanner {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: var(--green-soft);
+      color: #166534;
+      font-size: 13px;
+      font-weight: 700;
+      display: none;
+    }
+
+    .leaflet-popup-content { font-size: 14px; }
+
+    @media (min-width: 900px) {
+      .topbar { left: 16px; right: auto; width: 430px; }
+      .sheet { right: 16px; left: auto; width: 430px; background: none; padding: 0; bottom: 16px; }
+      .sheetCard { max-height: 62vh; }
+      .fabStack { right: 460px; bottom: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="topbar">
+    <div>
+      <div class="title">Milano Parcheggi</div>
+      <div class="subtitle">Prototipo mobile per studiare prima la destinazione e salvare dove hai lasciato l’auto.</div>
+    </div>
+    <div class="searchRow">
+      <div class="searchWrap">
+        <input id="searchInput" list="presetAreas" placeholder="Destinazione: Duomo, Centrale, Navigli..." />
+        <button id="searchBtn" class="btn-primary btn-small">Vai</button>
+      </div>
+      <button id="locateBtn" class="btn-soft">GPS</button>
+    </div>
+    <datalist id="presetAreas">
+      <option value="Duomo"></option>
+      <option value="Cadorna"></option>
+      <option value="Centrale"></option>
+      <option value="Porta Romana"></option>
+      <option value="Navigli"></option>
+      <option value="San Siro"></option>
+      <option value="Bicocca"></option>
+      <option value="Loreto"></option>
+    </datalist>
+  </div>
+
+  <div class="fabStack">
+    <button id="fitZonesBtn" class="fab" title="Vista Milano">⌂</button>
+    <button id="goToCarBtn" class="fab" title="Torna all'auto">🚗</button>
+  </div>
+
+  <div class="sheet">
+    <div class="sheetCard">
+      <div class="grabber"></div>
+      <div class="sectionTitle">
+        <h2 id="zoneTitle">Benvenuto</h2>
+        <span id="zoneBadge" class="pill pill-gray">demo</span>
+      </div>
+      <div id="zoneText" class="muted">Questo prototipo è pensato per Android: cerca una destinazione, usa il GPS o tocca una zona della mappa.</div>
+
+      <div class="infoGrid">
+        <div class="miniCard">
+          <div class="miniLabel">Tipo sosta</div>
+          <div id="parkingType" class="miniValue">—</div>
+        </div>
+        <div class="miniCard">
+          <div class="miniLabel">Strategia</div>
+          <div id="strategyText" class="miniValue">—</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="parkBtn" class="btn-primary">Ho parcheggiato</button>
+        <button id="studyBtn">Studia zona</button>
+      </div>
+
+      <div id="noticeBox" class="notice">Nella versione completa qui leggerai regole ATM, residenti, orari, pagamento e consigli di ricerca via per via.</div>
+      <div id="planBox" class="planCard hidden"></div>
+      <div id="savedBanner" class="savedBanner"></div>
+    </div>
+  </div>
+
+<script>
+  const map = L.map('map', { zoomControl: false }).setView([45.4642, 9.19], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+  const areas = [
+    {
+      id: 'duomo',
+      aliases: ['duomo', 'centro'],
+      name: 'Duomo / Centro',
+      parkingType: 'Pagamento',
+      badge: 'alta pressione',
+      badgeClass: 'pill-blue',
+      strategy: 'bordo area',
+      color: '#2563eb',
+      center: [45.4642, 9.1916],
+      coords: [[45.4690,9.1835],[45.4690,9.1995],[45.4590,9.1995],[45.4590,9.1835]],
+      rules: 'Zona centrale. Domanda molto alta. Adatta soprattutto per pianificare in anticipo e scegliere vie di bordo.',
+      tip: 'Evita di puntare al cuore della zona. Meglio preparare due alternative già prima di partire.',
+      plan: 'Per il centro conviene arrivare con 2-3 aree candidate e tenere un piano B vicino a una fermata metro.'
+    },
+    {
+      id: 'cadorna',
+      aliases: ['cadorna', 'castello'],
+      name: 'Cadorna / Castello',
+      parkingType: 'Pagamento',
+      badge: 'comoda per centro',
+      badgeClass: 'pill-green',
+      strategy: 'laterali utili',
+      color: '#2563eb',
+      center: [45.4700, 9.1795],
+      coords: [[45.4750,9.1710],[45.4750,9.1875],[45.4650,9.1875],[45.4650,9.1710]],
+      rules: 'Zona valida per destinazioni centrali senza spingersi troppo dentro il centro storico.',
+      tip: 'Studia prima le vie laterali: la prima strada utile spesso non è quella più vicina alla destinazione.',
+      plan: 'Buona zona se vuoi combinare auto + tratto finale a piedi.'
+    },
+    {
+      id: 'centrale',
+      aliases: ['centrale', 'stazione centrale'],
+      name: 'Stazione Centrale',
+      parkingType: 'Pagamento',
+      badge: 'rotazione veloce',
+      badgeClass: 'pill-yellow',
+      strategy: 'servono alternative',
+      color: '#2563eb',
+      center: [45.4855, 9.2044],
+      coords: [[45.4915,9.1940],[45.4915,9.2145],[45.4795,9.2145],[45.4795,9.1940]],
+      rules: 'Area intensa, con traffico e ricambio alto. Conviene pianificare bene prima di entrare nella zona.',
+      tip: 'Perfetta per la funzione futura “dove provo prima”.',
+      plan: 'Prima di partire scegli una via prioritaria e due vie alternative entro 5-8 minuti a piedi.'
+    },
+    {
+      id: 'navigli',
+      aliases: ['navigli', 'porta genova'],
+      name: 'Navigli / Porta Genova',
+      parkingType: 'Pagamento',
+      badge: 'molto richiesto',
+      badgeClass: 'pill-yellow',
+      strategy: 'arriva preparato',
+      color: '#2563eb',
+      center: [45.4529, 9.1725],
+      coords: [[45.4585,9.1620],[45.4585,9.1815],[45.4465,9.1815],[45.4465,9.1620]],
+      rules: 'Utile per uscite serali e destinazioni vivaci. Qui la preparazione in anticipo conta molto.',
+      tip: 'Se arrivi in orari critici, valuta anche zone un po’ più lontane ma meno tese.',
+      plan: 'App ideale: confrontare 3 strade vicine e salvare la migliore prima di muoverti.'
+    },
+    {
+      id: 'sansiro',
+      aliases: ['san siro', 'lotto'],
+      name: 'San Siro / Lotto',
+      parkingType: 'Intercambio / misto',
+      badge: 'strategica',
+      badgeClass: 'pill-green',
+      strategy: 'parcheggio + metro',
+      color: '#16a34a',
+      center: [45.4781, 9.1240],
+      coords: [[45.4855,9.1110],[45.4855,9.1390],[45.4695,9.1390],[45.4695,9.1110]],
+      rules: 'Area molto interessante per lasciare l’auto e poi entrare in città con i mezzi.',
+      tip: 'Ideale quando non vuoi stressarti con il centro.',
+      plan: 'Candidata perfetta per una futura funzione “zone consigliate”.'
+    },
+    {
+      id: 'bicocca',
+      aliases: ['bicocca'],
+      name: 'Bicocca',
+      parkingType: 'Intercambio / misto',
+      badge: 'più gestibile',
+      badgeClass: 'pill-green',
+      strategy: 'nord-est',
+      color: '#16a34a',
+      center: [45.5130, 9.2110],
+      coords: [[45.5205,9.1965],[45.5205,9.2265],[45.5035,9.2265],[45.5035,9.1965]],
+      rules: 'Area spesso più gestibile rispetto al centro, utile per destinazioni a nord-est.',
+      tip: 'Ottima per ragionare in anticipo prima di uno spostamento.',
+      plan: 'Buona per sperimentare la logica “parcheggio comodo + ultimo tratto con mezzi”.'
+    },
+    {
+      id: 'portaromana',
+      aliases: ['porta romana'],
+      name: 'Porta Romana',
+      parkingType: 'Pagamento',
+      badge: 'buon compromesso',
+      badgeClass: 'pill-green',
+      strategy: 'laterali',
+      color: '#2563eb',
+      center: [45.4528, 9.2020],
+      coords: [[45.4605,9.1935],[45.4605,9.2115],[45.4445,9.2115],[45.4445,9.1935]],
+      rules: 'Buon equilibrio tra accesso e distanza dal centro. Da leggere con calma prima di andare.',
+      tip: 'Meglio non fissarsi sulla via esatta della destinazione.',
+      plan: 'Conviene cercare nelle laterali con una passeggiata finale breve.'
+    },
+    {
+      id: 'loreto',
+      aliases: ['loreto', 'buenos aires'],
+      name: 'Loreto / Buenos Aires',
+      parkingType: 'Pagamento / misto',
+      badge: 'densa',
+      badgeClass: 'pill-yellow',
+      strategy: 'confronta zone vicine',
+      color: '#2563eb',
+      center: [45.4840, 9.2080],
+      coords: [[45.4890,9.1995],[45.4890,9.2165],[45.4785,9.2165],[45.4785,9.1995]],
+      rules: 'Area molto intensa. Perfetta per testare la logica della webapp orientata alla scelta anticipata.',
+      tip: 'Qui sarà utilissima la futura vista per singola via.',
+      plan: 'Prima di partire confronta almeno due micro-zone ai lati della destinazione principale.'
+    },
+    {
+      id: 'residenti-demo',
+      aliases: ['residenti demo'],
+      name: 'Esempio area riservata',
+      parkingType: 'Residenti / riservato',
+      badge: 'da evitare',
+      badgeClass: 'pill-yellow',
+      strategy: 'non adatta',
+      color: '#ca8a04',
+      center: [45.4718, 9.1605],
+      coords: [[45.4745,9.1565],[45.4745,9.1655],[45.4685,9.1655],[45.4685,9.1565]],
+      rules: 'Area demo per mostrare come la futura app segnalerà le zone residenti o riservate.',
+      tip: 'L’obiettivo vero è evitare errori, non solo vedere la mappa.',
+      plan: 'Nella versione completa questa scheda mostrerà chiaramente perché una via non è consigliata.'
+    }
+  ];
+
+  const zoneTitle = document.getElementById('zoneTitle');
+  const zoneBadge = document.getElementById('zoneBadge');
+  const zoneText = document.getElementById('zoneText');
+  const parkingType = document.getElementById('parkingType');
+  const strategyText = document.getElementById('strategyText');
+  const noticeBox = document.getElementById('noticeBox');
+  const planBox = document.getElementById('planBox');
+  const savedBanner = document.getElementById('savedBanner');
+
+  let currentArea = null;
+  let myMarker = null;
+  let myCircle = null;
+  let savedCarMarker = null;
+
+  const areaIndex = {};
+  const group = L.featureGroup().addTo(map);
+
+  function setSheet(area, mode = 'manual') {
+    currentArea = area;
+    zoneTitle.textContent = area.name;
+    zoneBadge.textContent = area.badge;
+    zoneBadge.className = `pill ${area.badgeClass}`;
+    zoneText.textContent = area.rules;
+    parkingType.textContent = area.parkingType;
+    strategyText.textContent = area.strategy;
+    noticeBox.textContent = area.tip + (mode === 'gps' ? ' Sei dentro o vicino a questa zona demo.' : '');
+    planBox.innerHTML = `<strong>Come la userei io</strong>${area.plan}`;
+    planBox.classList.remove('hidden');
+  }
+
+  function setWelcome() {
+    zoneTitle.textContent = 'Benvenuto';
+    zoneBadge.textContent = 'demo';
+    zoneBadge.className = 'pill pill-gray';
+    zoneText.textContent = 'Cerca una destinazione o tocca una zona. Questa è la base della futura app parcheggi per tutta Milano.';
+    parkingType.textContent = '—';
+    strategyText.textContent = '—';
+    noticeBox.textContent = 'Versione prototipo: poche zone demo, ma già pensata per l’uso reale su Android.';
+    planBox.classList.add('hidden');
+  }
+
+  function saveCar() {
+    if (!myMarker) {
+      savedBanner.style.display = 'block';
+      savedBanner.textContent = 'Prima usa GPS o scegli una zona.';
+      return;
+    }
+    const latlng = myMarker.getLatLng();
+    localStorage.setItem('milanoParcheggiCar', JSON.stringify({
+      lat: latlng.lat,
+      lng: latlng.lng,
+      areaId: currentArea?.id || null,
+      savedAt: new Date().toISOString()
+    }));
+    renderSavedCar();
+    savedBanner.style.display = 'block';
+    savedBanner.textContent = 'Posizione auto salvata sul dispositivo.';
+  }
+
+  function renderSavedCar() {
+    const raw = localStorage.getItem('milanoParcheggiCar');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const latlng = [data.lat, data.lng];
+    if (savedCarMarker) map.removeLayer(savedCarMarker);
+    savedCarMarker = L.marker(latlng).addTo(map).bindPopup('Auto salvata qui');
+  }
+
+  function goToCar() {
+    const raw = localStorage.getItem('milanoParcheggiCar');
+    if (!raw) {
+      savedBanner.style.display = 'block';
+      savedBanner.textContent = 'Non hai ancora salvato la posizione dell’auto.';
+      return;
+    }
+    const data = JSON.parse(raw);
+    map.setView([data.lat, data.lng], 16);
+    if (savedCarMarker) savedCarMarker.openPopup();
+    savedBanner.style.display = 'block';
+    savedBanner.textContent = 'Ti ho riportato al punto in cui hai salvato l’auto.';
+  }
+
+  function findAreaByText(text) {
+    const q = text.trim().toLowerCase();
+    if (!q) return null;
+    return areas.find(area => area.name.toLowerCase().includes(q) || area.aliases.some(a => a.includes(q) || q.includes(a))) || null;
+  }
+
+  function findContainingArea(latlng) {
+    return areas.find(a => L.polygon(a.coords).getBounds().contains(latlng)) || null;
+  }
+
+  areas.forEach(area => {
+    areaIndex[area.id] = area;
+    const polygon = L.polygon(area.coords, {
+      color: area.color,
+      fillColor: area.color,
+      fillOpacity: 0.22,
+      weight: 2
+    }).addTo(group);
+
+    polygon.bindTooltip(area.name);
+    polygon.on('click', () => {
+      setSheet(area);
+      map.fitBounds(polygon.getBounds(), { padding: [28, 28] });
+    });
+  });
+
+  const bounds = group.getBounds();
+  map.fitBounds(bounds.pad(0.15));
+
+  document.getElementById('searchBtn').addEventListener('click', () => {
+    const value = document.getElementById('searchInput').value;
+    const area = findAreaByText(value);
+    if (!area) {
+      zoneTitle.textContent = 'Zona non trovata';
+      zoneBadge.textContent = 'ricerca';
+      zoneBadge.className = 'pill pill-gray';
+      zoneText.textContent = 'Nel prototipo la ricerca funziona solo su alcune zone demo. Nella versione vera useremo ricerca per indirizzo e aree vicine.';
+      parkingType.textContent = '—';
+      strategyText.textContent = 'ampliare dataset';
+      noticeBox.textContent = 'Questo è il punto dove aggiungeremo geocoding, dati ATM e suggerimenti di parcheggio.';
+      planBox.classList.add('hidden');
+      return;
+    }
+    setSheet(area);
+    map.setView(area.center, 14);
+  });
+
+  document.getElementById('locateBtn').addEventListener('click', () => {
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      zoneTitle.textContent = 'GPS bloccato';
+      zoneBadge.textContent = 'https richiesto';
+      zoneBadge.className = 'pill pill-yellow';
+      zoneText.textContent = 'Su Android il GPS nel browser funziona bene se la webapp è servita in https oppure da localhost.';
+      parkingType.textContent = 'browser';
+      strategyText.textContent = 'pubblicare PWA';
+      noticeBox.textContent = 'Quando la metteremo online o la lancerai in locale con un piccolo server, il GPS funzionerà correttamente.';
+      planBox.classList.add('hidden');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        map.setView(latlng, 15);
+
+        if (myMarker) map.removeLayer(myMarker);
+        if (myCircle) map.removeLayer(myCircle);
+
+        myMarker = L.marker(latlng).addTo(map).bindPopup('Sei qui');
+        myCircle = L.circle(latlng, { radius: pos.coords.accuracy }).addTo(map);
+
+        const hit = findContainingArea(latlng);
+        if (hit) {
+          setSheet(hit, 'gps');
+        } else {
+          zoneTitle.textContent = 'Posizione rilevata';
+          zoneBadge.textContent = 'fuori demo';
+          zoneBadge.className = 'pill pill-gray';
+          zoneText.textContent = 'La tua posizione è stata trovata, ma sei fuori dalle zone demo del prototipo.';
+          parkingType.textContent = '—';
+          strategyText.textContent = 'estendere Milano';
+          noticeBox.textContent = 'Nella versione vera ci saranno tutte le aree utili di Milano e la logica completa per lo studio della destinazione.';
+          planBox.classList.add('hidden');
+        }
+      },
+      err => {
+        zoneTitle.textContent = 'Errore GPS';
+        zoneBadge.textContent = 'permessi';
+        zoneBadge.className = 'pill pill-yellow';
+        const messages = {
+          1: 'Permesso negato. Su Android devi consentire la posizione al browser.',
+          2: 'Posizione non disponibile.',
+          3: 'Tempo scaduto nella richiesta GPS.'
+        };
+        zoneText.textContent = messages[err.code] || 'Errore sconosciuto nella geolocalizzazione.';
+        parkingType.textContent = 'browser';
+        strategyText.textContent = 'controlla permessi';
+        noticeBox.textContent = 'Quando la trasformeremo in PWA, l’esperienza sarà molto più simile a una vera app.';
+        planBox.classList.add('hidden');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+
+  document.getElementById('parkBtn').addEventListener('click', saveCar);
+  document.getElementById('goToCarBtn').addEventListener('click', goToCar);
+  document.getElementById('fitZonesBtn').addEventListener('click', () => map.fitBounds(bounds.pad(0.15)));
+  document.getElementById('studyBtn').addEventListener('click', () => {
+    if (!currentArea) {
+      savedBanner.style.display = 'block';
+      savedBanner.textContent = 'Prima seleziona una zona.';
+      return;
+    }
+    savedBanner.style.display = 'block';
+    savedBanner.textContent = `Zona in studio: ${currentArea.name}. Questa è la funzione che evolveremo per cercare le vie migliori prima di partire.`;
+  });
+
+  renderSavedCar();
+  setWelcome();
+</script>
+</body>
+</html>
