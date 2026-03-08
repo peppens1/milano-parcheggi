@@ -241,7 +241,10 @@
 
 <script>
   const map = L.map('map', { zoomControl: false }).setView([45.4642, 9.19], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
   const duomo = L.latLng(45.4642, 9.1916);
@@ -265,7 +268,6 @@
   const officialProfiles = {
     areaC: {
       title: 'Area C',
-      badge: 'ATM ufficiale',
       tariffa: '€ 3,00 / ora',
       quando: 'Tutti i giorni 08:00–19:00; 19:00–24:00 € 3,00/ora con prime 2 ore gratuite e successive a pagamento',
       dettagli: 'Max 2 ore al giorno per singolo codice area nella fascia diurna.',
@@ -372,7 +374,6 @@
 
   const group = L.featureGroup().addTo(map);
 
-  // Layer macro-aree ATM stimate
   const areaCcircle = L.circle(duomo, { radius: 1900, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.06, weight: 2 }).addTo(map);
   const filocircle = L.circle(duomo, { radius: 4700, color: '#16a34a', fillColor: '#16a34a', fillOpacity: 0.05, weight: 2 }).addTo(map);
   const cityRect = L.rectangle(cityBounds, { color: '#ca8a04', fillColor: '#ca8a04', fillOpacity: 0.03, weight: 1 }).addTo(map);
@@ -385,275 +386,6 @@
       hideRecommendations();
     });
   });
-
-  function setSheetCollapsed(collapsed) {
-    sheetCollapsed = collapsed;
-    sheetCard.classList.toggle('collapsed', collapsed);
-    sheetBody.classList.toggle('hiddenBody', collapsed);
-    sheetToggleBtn.textContent = collapsed ? 'Apri' : 'Riduci';
-  }
-  function toggleSheet() { setSheetCollapsed(!sheetCollapsed); }
-  function showBanner(text, persistent = false) {
-    savedBanner.style.display = 'block';
-    savedBanner.textContent = text;
-    if (!persistent) {
-      clearTimeout(showBanner._timeout);
-      showBanner._timeout = setTimeout(() => { savedBanner.style.display = 'none'; }, 3500);
-          <option value="facile">Strategia: Parcheggio facile</option>
-        </select>
-      </div>
-    </div>
-    <datalist id="presetAreas">
-      <option value="Duomo"></option>
-      <option value="Cadorna"></option>
-      <option value="Centrale"></option>
-      <option value="Porta Romana"></option>
-      <option value="Navigli"></option>
-      <option value="San Siro"></option>
-      <option value="Bicocca"></option>
-      <option value="Loreto"></option>
-    </datalist>
-  </div>
-
-  <div class="fabStack">
-    <button id="fitZonesBtn" class="fab" title="Vista Milano">⌂</button>
-    <button id="goToCarBtn" class="fab" title="Torna all'auto">🚗</button>
-  </div>
-
-  <div class="sheet">
-    <div id="sheetCard" class="sheetCard">
-      <div id="sheetGrabber" class="grabber"></div>
-      <div class="sheetHeaderRow">
-        <div class="muted" style="font-size:12px; font-weight:700;">Pannello zona</div>
-        <button id="sheetToggleBtn" class="sheetToggle">Riduci</button>
-      </div>
-      <div id="sheetBody" class="sheetBody">
-      <div class="sectionTitle">
-        <h2 id="zoneTitle">Benvenuto</h2>
-        <span id="zoneBadge" class="pill pill-gray">demo</span>
-      </div>
-      <div id="zoneText" class="muted">Questo prototipo è pensato per Android: cerca una destinazione, usa il GPS o tocca una zona della mappa.</div>
-
-      <div class="infoGrid">
-        <div class="miniCard">
-          <div class="miniLabel">Tipo sosta</div>
-          <div id="parkingType" class="miniValue">—</div>
-        </div>
-        <div class="miniCard">
-          <div class="miniLabel">Strategia</div>
-          <div id="strategyText" class="miniValue">—</div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button id="parkBtn" class="btn-primary">Ho parcheggiato</button>
-        <button id="studyBtn">Studia zona</button>
-      </div>
-
-      <div id="noticeBox" class="notice">Nella versione completa qui leggerai regole ATM, residenti, orari, pagamento e consigli di ricerca via per via.</div>
-      <div id="planBox" class="planCard hidden"></div>
-      <div id="recommendationsBox" class="recommendations hidden"></div>
-      <div id="savedBanner" class="savedBanner"></div>
-      </div>
-    </div>
-  </div>
-
-<script>
-  const map = L.map('map', { zoomControl: false }).setView([45.4642, 9.19], 12);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  L.control.zoom({ position: 'bottomleft' }).addTo(map);
-
-  const areas = [
-    // difficulty: 1 facile, 2 media, 3 difficile
-    // transitBonus: 1 scarso, 2 buono, 3 ottimo per parcheggio + mezzi
-    {
-      id: 'duomo',
-      aliases: ['duomo', 'centro'],
-      name: 'Duomo / Centro',
-      parkingType: 'Pagamento',
-      badge: 'alta pressione',
-      badgeClass: 'pill-blue',
-      strategy: 'bordo area',
-      color: '#2563eb',
-      center: [45.4642, 9.1916],
-      coords: [[45.4690,9.1835],[45.4690,9.1995],[45.4590,9.1995],[45.4590,9.1835]],
-      rules: 'Zona centrale. Domanda molto alta. Adatta soprattutto per pianificare in anticipo e scegliere vie di bordo.',
-      tip: 'Evita di puntare al cuore della zona. Meglio preparare due alternative già prima di partire.',
-      plan: 'Per il centro conviene arrivare con 2-3 aree candidate e tenere un piano B vicino a una fermata metro.',
-      difficulty: 3,
-      transitBonus: 2
-    },
-    {
-      id: 'cadorna',
-      aliases: ['cadorna', 'castello'],
-      name: 'Cadorna / Castello',
-      parkingType: 'Pagamento',
-      badge: 'comoda per centro',
-      badgeClass: 'pill-green',
-      strategy: 'laterali utili',
-      color: '#2563eb',
-      center: [45.4700, 9.1795],
-      coords: [[45.4750,9.1710],[45.4750,9.1875],[45.4650,9.1875],[45.4650,9.1710]],
-      rules: 'Zona valida per destinazioni centrali senza spingersi troppo dentro il centro storico.',
-      tip: 'Studia prima le vie laterali: la prima strada utile spesso non è quella più vicina alla destinazione.',
-      plan: 'Buona zona se vuoi combinare auto + tratto finale a piedi.',
-      difficulty: 2,
-      transitBonus: 2
-    },
-    {
-      id: 'centrale',
-      aliases: ['centrale', 'stazione centrale'],
-      name: 'Stazione Centrale',
-      parkingType: 'Pagamento',
-      badge: 'rotazione veloce',
-      badgeClass: 'pill-yellow',
-      strategy: 'servono alternative',
-      color: '#2563eb',
-      center: [45.4855, 9.2044],
-      coords: [[45.4915,9.1940],[45.4915,9.2145],[45.4795,9.2145],[45.4795,9.1940]],
-      rules: 'Area intensa, con traffico e ricambio alto. Conviene pianificare bene prima di entrare nella zona.',
-      tip: 'Perfetta per la funzione futura “dove provo prima”.',
-      plan: 'Prima di partire scegli una via prioritaria e due vie alternative entro 5-8 minuti a piedi.',
-      difficulty: 3,
-      transitBonus: 2
-    },
-    {
-      id: 'navigli',
-      aliases: ['navigli', 'porta genova'],
-      name: 'Navigli / Porta Genova',
-      parkingType: 'Pagamento',
-      badge: 'molto richiesto',
-      badgeClass: 'pill-yellow',
-      strategy: 'arriva preparato',
-      color: '#2563eb',
-      center: [45.4529, 9.1725],
-      coords: [[45.4585,9.1620],[45.4585,9.1815],[45.4465,9.1815],[45.4465,9.1620]],
-      rules: 'Utile per uscite serali e destinazioni vivaci. Qui la preparazione in anticipo conta molto.',
-      tip: 'Se arrivi in orari critici, valuta anche zone un po’ più lontane ma meno tese.',
-      plan: 'App ideale: confrontare 3 strade vicine e salvare la migliore prima di muoverti.',
-      difficulty: 3,
-      transitBonus: 2
-    },
-    {
-      id: 'sansiro',
-      aliases: ['san siro', 'lotto'],
-      name: 'San Siro / Lotto',
-      parkingType: 'Intercambio / misto',
-      badge: 'strategica',
-      badgeClass: 'pill-green',
-      strategy: 'parcheggio + metro',
-      color: '#16a34a',
-      center: [45.4781, 9.1240],
-      coords: [[45.4855,9.1110],[45.4855,9.1390],[45.4695,9.1390],[45.4695,9.1110]],
-      rules: 'Area molto interessante per lasciare l’auto e poi entrare in città con i mezzi.',
-      tip: 'Ideale quando non vuoi stressarti con il centro.',
-      plan: 'Candidata perfetta per una futura funzione “zone consigliate”.',
-      difficulty: 1,
-      transitBonus: 3
-    },
-    {
-      id: 'bicocca',
-      aliases: ['bicocca'],
-      name: 'Bicocca',
-      parkingType: 'Intercambio / misto',
-      badge: 'più gestibile',
-      badgeClass: 'pill-green',
-      strategy: 'nord-est',
-      color: '#16a34a',
-      center: [45.5130, 9.2110],
-      coords: [[45.5205,9.1965],[45.5205,9.2265],[45.5035,9.2265],[45.5035,9.1965]],
-      rules: 'Area spesso più gestibile rispetto al centro, utile per destinazioni a nord-est.',
-      tip: 'Ottima per ragionare in anticipo prima di uno spostamento.',
-      plan: 'Buona per sperimentare la logica “parcheggio comodo + ultimo tratto con mezzi”.',
-      difficulty: 1,
-      transitBonus: 3
-    },
-    {
-      id: 'portaromana',
-      aliases: ['porta romana'],
-      name: 'Porta Romana',
-      parkingType: 'Pagamento',
-      badge: 'buon compromesso',
-      badgeClass: 'pill-green',
-      strategy: 'laterali',
-      color: '#2563eb',
-      center: [45.4528, 9.2020],
-      coords: [[45.4605,9.1935],[45.4605,9.2115],[45.4445,9.2115],[45.4445,9.1935]],
-      rules: 'Buon equilibrio tra accesso e distanza dal centro. Da leggere con calma prima di andare.',
-      tip: 'Meglio non fissarsi sulla via esatta della destinazione.',
-      plan: 'Conviene cercare nelle laterali con una passeggiata finale breve.',
-      difficulty: 2,
-      transitBonus: 2
-    },
-    {
-      id: 'loreto',
-      aliases: ['loreto', 'buenos aires'],
-      name: 'Loreto / Buenos Aires',
-      parkingType: 'Pagamento / misto',
-      badge: 'densa',
-      badgeClass: 'pill-yellow',
-      strategy: 'confronta zone vicine',
-      color: '#2563eb',
-      center: [45.4840, 9.2080],
-      coords: [[45.4890,9.1995],[45.4890,9.2165],[45.4785,9.2165],[45.4785,9.1995]],
-      rules: 'Area molto intensa. Perfetta per testare la logica della webapp orientata alla scelta anticipata.',
-      tip: 'Qui sarà utilissima la futura vista per singola via.',
-      plan: 'Prima di partire confronta almeno due micro-zone ai lati della destinazione principale.',
-      difficulty: 3,
-      transitBonus: 2
-    },
-    {
-      id: 'residenti-demo',
-      aliases: ['residenti demo'],
-      name: 'Esempio area riservata',
-      parkingType: 'Residenti / riservato',
-      badge: 'da evitare',
-      badgeClass: 'pill-yellow',
-      strategy: 'non adatta',
-      color: '#ca8a04',
-      center: [45.4718, 9.1605],
-      coords: [[45.4745,9.1565],[45.4745,9.1655],[45.4685,9.1655],[45.4685,9.1565]],
-      rules: 'Area demo per mostrare come la futura app segnalerà le zone residenti o riservate.',
-      tip: 'L’obiettivo vero è evitare errori, non solo vedere la mappa.',
-      plan: 'Nella versione completa questa scheda mostrerà chiaramente perché una via non è consigliata.',
-      difficulty: 3,
-      transitBonus: 1
-    }
-  ];
-
-  const zoneTitle = document.getElementById('zoneTitle');
-  const zoneBadge = document.getElementById('zoneBadge');
-  const zoneText = document.getElementById('zoneText');
-  const parkingType = document.getElementById('parkingType');
-  const strategyText = document.getElementById('strategyText');
-  const noticeBox = document.getElementById('noticeBox');
-  const planBox = document.getElementById('planBox');
-  const recommendationsBox = document.getElementById('recommendationsBox');
-  const sheetCard = document.getElementById('sheetCard');
-  const sheetBody = document.getElementById('sheetBody');
-  const sheetToggleBtn = document.getElementById('sheetToggleBtn');
-  const sheetGrabber = document.getElementById('sheetGrabber');
-  const savedBanner = document.getElementById('savedBanner');
-  const searchInput = document.getElementById('searchInput');
-  const searchBtn = document.getElementById('searchBtn');
-  const locateBtn = document.getElementById('locateBtn');
-  const strategySelect = document.getElementById('strategySelect');
-
-  let currentArea = null;
-  let myMarker = null;
-  let myCircle = null;
-  let savedCarMarker = null;
-  let destinationMarker = null;
-  let searchCircle = null;
-
-  const group = L.featureGroup().addTo(map);
-
-  let sheetCollapsed = false;
 
   function setSheetCollapsed(collapsed) {
     sheetCollapsed = collapsed;
@@ -682,98 +414,66 @@
     recommendationsBox.classList.add('hidden');
   }
 
-  function renderRecommendations(items, destinationLatLng) {
-    if (!items || !items.length) {
-      hideRecommendations();
+  function hideAtmBox() {
+    atmBox.innerHTML = '';
+    atmBox.classList.add('hidden');
+  }
+
+  function classifyATM(latlng) {
+    const d = map.distance(latlng, duomo);
+    if (d <= 1900) {
+      return { macro: 'Area C', profileKeys: ['areaC'], note: 'Stima macro-area ATM: area più centrale.' };
+    }
+    if (d <= 4700) {
+      return { macro: 'Cerchia filoviaria', profileKeys: ['filo_11', 'filo_15', 'filo_27', 'filo_12', 'filo_13'], note: 'Stima macro-area ATM: fascia filoviaria.' };
+    }
+    return { macro: 'Cerchia extra-filoviaria', profileKeys: ['extra_19', 'extra_18', 'extra_31', 'extra_17', 'extra_07'], note: 'Stima macro-area ATM: fascia extra-filoviaria.' };
+  }
+
+  function renderAtmProfiles(profileKeys) {
+    if (!profileKeys || !profileKeys.length) {
+      hideAtmBox();
       return;
     }
-
-    recommendationsBox.innerHTML = '';
-    const labels = ['Prima scelta', 'Alternativa', 'Piano B'];
-    const strategyMode = strategySelect.value;
-
-    items.forEach((item, index) => {
+    atmBox.innerHTML = '';
+    profileKeys.forEach(key => {
+      const p = officialProfiles[key];
+      if (!p) return;
       const card = document.createElement('div');
-      card.className = 'recCard';
+      card.className = 'atmCard';
       card.innerHTML = `
-        <div class="recTop">
-          <div>
-            <div class="recTitle">${item.area.name}</div>
-            <div class="recMeta">${item.area.parkingType} · ${Math.round(item.distance)} m dalla destinazione</div>
-          </div>
-          <span class="recTag">${labels[index] || 'Opzione'}</span>
-        </div>
-        <div class="recMeta"><strong>Strategia:</strong> ${item.area.strategy}</div>
-        <div class="recMeta"><strong>Modalità attiva:</strong> ${strategyMode}</div>
-        <div class="recMeta">${item.area.tip}</div>
+        <strong>${p.title}</strong>
+        <div class="recMeta"><strong>Tariffa:</strong> ${p.tariffa}</div>
+        <div class="recMeta"><strong>Quando si paga:</strong> ${p.quando}</div>
+        <div class="recMeta">${p.dettagli}</div>
+        <div class="atmCodes"><strong>Codici ATM:</strong> ${p.codes.join(', ')}</div>
       `;
-
-      card.addEventListener('click', () => {
-        setSheet(item.area, 'manual', `Questa è una delle zone consigliate vicino alla destinazione.`);
-        const bounds = L.latLngBounds([]);
-        item.area.coords.forEach(c => bounds.extend(c));
-        bounds.extend(destinationLatLng);
-        map.fitBounds(bounds.pad(0.25));
-      });
-
-      recommendationsBox.appendChild(card);
+      atmBox.appendChild(card);
     });
-
-    recommendationsBox.classList.remove('hidden');
+    atmBox.classList.remove('hidden');
   }
 
-  function getRecommendationScore(area, distance, mode) {
-    const difficultyPenalty = area.difficulty || 2;
-    const transitBonus = area.transitBonus || 2;
-
-    if (mode === 'vicino') {
-      return distance + (difficultyPenalty * 220) - (transitBonus * 40);
-    }
-
-    if (mode === 'facile') {
-      return distance * 0.65 + (difficultyPenalty * 520) - (transitBonus * 180);
-    }
-
-    // equilibrato
-    return distance * 0.85 + (difficultyPenalty * 320) - (transitBonus * 110);
-  }
-
-  function getTopRecommendations(latlng, limit = 3) {
-    const mode = strategySelect.value;
-    return areas
-      .map(area => {
-        const distance = map.distance(latlng, L.latLng(area.center[0], area.center[1]));
-        return {
-          area,
-          distance,
-          score: getRecommendationScore(area, distance, mode)
-        };
-      })
-      .sort((a, b) => a.score - b.score)
-      .slice(0, limit);
-  }
-
-  function setSheet(area, mode = 'manual', extra = '') {
+  function setStrategyArea(area, mode = 'manual', extra = '') {
     currentArea = area;
     zoneTitle.textContent = area.name;
-    zoneBadge.textContent = area.badge;
-    zoneBadge.className = `pill ${area.badgeClass}`;
-    zoneText.textContent = area.rules;
+    zoneBadge.textContent = area.kind;
+    zoneBadge.className = 'pill pill-blue';
+    zoneText.textContent = area.plan;
     parkingType.textContent = area.parkingType;
     strategyText.textContent = area.strategy;
-    noticeBox.textContent = area.tip + (mode === 'gps' ? ' Sei dentro o vicino a questa zona demo.' : '') + (extra ? ' ' + extra : '');
+    noticeBox.textContent = `${extra || ''} ${mode === 'gps' ? 'Zona proposta rispetto alla tua posizione attuale.' : 'Zona proposta per la tua strategia di parcheggio.'}`.trim();
     planBox.innerHTML = `<strong>Come la userei io</strong>${area.plan}`;
     planBox.classList.remove('hidden');
   }
 
-  function setCustomResult(title, subtitle, strategy, note, planHtml = '') {
+  function setCustomResult(title, subtitle, macroArea, note, planHtml = '') {
     currentArea = null;
     zoneTitle.textContent = title;
-    zoneBadge.textContent = 'ricerca';
+    zoneBadge.textContent = 'ATM';
     zoneBadge.className = 'pill pill-gray';
     zoneText.textContent = subtitle;
-    parkingType.textContent = 'indirizzo';
-    strategyText.textContent = strategy;
+    parkingType.textContent = macroArea;
+    strategyText.textContent = strategySelect.value;
     noticeBox.textContent = note;
     if (planHtml) {
       planBox.innerHTML = `<strong>Come la userei io</strong>${planHtml}`;
@@ -785,14 +485,15 @@
 
   function setWelcome() {
     zoneTitle.textContent = 'Benvenuto';
-    zoneBadge.textContent = 'demo';
+    zoneBadge.textContent = 'ATM beta';
     zoneBadge.className = 'pill pill-gray';
-    zoneText.textContent = 'Cerca una destinazione o tocca una zona. Questa è la base della futura app parcheggi per tutta Milano.';
+    zoneText.textContent = 'Questa versione usa regole ATM ufficiali e copre tutta Milano con una stima delle macro-aree.';
     parkingType.textContent = '—';
-    strategyText.textContent = '—';
-    noticeBox.textContent = 'Versione prototipo: poche zone demo, ma già pensata per l’uso reale su Android.';
+    strategyText.textContent = strategySelect.value;
+    noticeBox.textContent = 'Cerca un indirizzo per vedere macro-area ATM, tariffe ufficiali e 3 aree strategiche vicine.';
     planBox.classList.add('hidden');
     hideRecommendations();
+    hideAtmBox();
   }
 
   function saveCar() {
@@ -801,12 +502,7 @@
       showBanner('Prima usa GPS o cerca una destinazione.');
       return;
     }
-    localStorage.setItem('milanoParcheggiCar', JSON.stringify({
-      lat: latlng.lat,
-      lng: latlng.lng,
-      areaId: currentArea?.id || null,
-      savedAt: new Date().toISOString()
-    }));
+    localStorage.setItem('milanoParcheggiCar', JSON.stringify({ lat: latlng.lat, lng: latlng.lng, savedAt: new Date().toISOString() }));
     renderSavedCar();
     showBanner('Posizione auto salvata sul dispositivo.');
   }
@@ -832,37 +528,58 @@
     showBanner('Ti ho riportato al punto in cui hai salvato l’auto.');
   }
 
-  function findAreaByText(text) {
-    const q = text.trim().toLowerCase();
-    if (!q) return null;
-
-    const addressPattern = new RegExp('(via|viale|piazza|piazzale|corso|largo|vicolo|naviglio|alzaia)', 'i');
-    const looksLikeAddress = /\d/.test(q) || addressPattern.test(q) || q.includes(',');
-    if (looksLikeAddress) return null;
-
-    return areas.find(area =>
-      area.name.toLowerCase() === q ||
-      area.aliases.some(a => a === q) ||
-      area.name.toLowerCase().includes(q) ||
-      area.aliases.some(a => a.includes(q) || q.includes(a))
-    ) || null;
+  function getRecommendationScore(area, distance, mode) {
+    const difficultyPenalty = area.difficulty || 2;
+    const transitBonus = area.transitBonus || 2;
+    if (mode === 'vicino') return distance + difficultyPenalty * 240 - transitBonus * 35;
+    if (mode === 'facile') return distance * 0.65 + difficultyPenalty * 520 - transitBonus * 180;
+    return distance * 0.85 + difficultyPenalty * 320 - transitBonus * 110;
   }
 
-  function findContainingArea(latlng) {
-    return areas.find(a => L.polygon(a.coords).getBounds().contains(latlng)) || null;
+  function getTopRecommendations(latlng, limit = 3) {
+    const mode = strategySelect.value;
+    return strategyAreas
+      .map(area => {
+        const distance = map.distance(latlng, L.latLng(area.center[0], area.center[1]));
+        return { area, distance, score: getRecommendationScore(area, distance, mode) };
+      })
+      .sort((a, b) => a.score - b.score)
+      .slice(0, limit);
   }
 
-  function findNearestArea(latlng) {
-    let nearest = null;
-    let best = Infinity;
-    areas.forEach(area => {
-      const dist = map.distance(latlng, L.latLng(area.center[0], area.center[1]));
-      if (dist < best) {
-        best = dist;
-        nearest = area;
-      }
+  function renderRecommendations(items, destinationLatLng) {
+    if (!items || !items.length) {
+      hideRecommendations();
+      return;
+    }
+    recommendationsBox.innerHTML = '';
+    const labels = ['Prima scelta', 'Alternativa', 'Piano B'];
+    const strategyMode = strategySelect.value;
+    items.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'recCard';
+      card.innerHTML = `
+        <div class="recTop">
+          <div>
+            <div class="recTitle">${item.area.name}</div>
+            <div class="recMeta">${item.area.parkingType} · ${Math.round(item.distance)} m dalla destinazione</div>
+          </div>
+          <span class="recTag">${labels[index]}</span>
+        </div>
+        <div class="recMeta"><strong>Strategia zona:</strong> ${item.area.strategy}</div>
+        <div class="recMeta"><strong>Modalità attiva:</strong> ${strategyMode}</div>
+        <div class="recMeta">${item.area.plan}</div>
+      `;
+      card.addEventListener('click', () => {
+        setStrategyArea(item.area, 'manual', 'Questa è una delle 3 aree strategiche suggerite.');
+        const bounds = L.latLngBounds([]);
+        bounds.extend(destinationLatLng);
+        bounds.extend(item.area.center);
+        map.fitBounds(bounds.pad(0.25));
+      });
+      recommendationsBox.appendChild(card);
     });
-    return { area: nearest, distance: best };
+    recommendationsBox.classList.remove('hidden');
   }
 
   async function searchRealAddress() {
@@ -871,95 +588,125 @@
       showBanner('Scrivi un indirizzo o una zona.');
       return;
     }
-
-    const localArea = findAreaByText(query);
-    if (localArea) {
-      setSheet(localArea);
-      map.setView(localArea.center, 14);
-      hideRecommendations();
-      return;
-    }
-
     searchBtn.disabled = true;
     searchBtn.textContent = '...';
-
     try {
-      const candidates = [];
-      const q = query.trim();
-
-      if (/milano/i.test(q)) {
-        candidates.push(q);
-      } else {
-        candidates.push(`${q}, Milano, Italia`);
-        candidates.push(`${q}, Milano`);
-      }
-      candidates.push(q);
-
+      const candidates = /milano/i.test(query) ? [query, query.trim()] : [`${query}, Milano, Italia`, `${query}, Milano`, query];
       let result = null;
-
       for (const candidate of candidates) {
         const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&countrycodes=it&q=${encodeURIComponent(candidate)}`;
-        const response = await fetch(url, {
-          headers: { 'Accept': 'application/json' }
-        });
-
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
         if (!response.ok) continue;
         const results = await response.json();
         if (!results.length) continue;
-
         const milanoResults = results.filter(r => /milano/i.test(r.display_name || ''));
         const pool = milanoResults.length ? milanoResults : results;
-
-        result =
-          pool.find(r => ['house', 'residential', 'road', 'pedestrian', 'street', 'place'].includes(r.type)) ||
-          pool.find(r => ['building', 'amenity', 'railway'].includes(r.type)) ||
-          pool[0];
-
+        result = pool.find(r => ['house','residential','road','pedestrian','street','place'].includes(r.type)) || pool[0];
         if (result) break;
       }
-
       if (!result) {
-        setCustomResult(
-          'Indirizzo non trovato',
-          'Non ho trovato risultati utili per questa ricerca.',
-          'prova indirizzo completo',
-          'Scrivi via e numero civico, ad esempio “Via Torino 32, Milano”, oppure una zona come “Navigli”.'
-        );
+        setCustomResult('Indirizzo non trovato', 'Non ho trovato risultati utili per questa ricerca.', '—', 'Scrivi via e numero civico, ad esempio “Via Torino 32, Milano”.');
         hideRecommendations();
+        hideAtmBox();
         return;
       }
-
       const latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
-      map.setView(latlng, 16);
-
+      map.setView(latlng, 15);
       if (destinationMarker) map.removeLayer(destinationMarker);
       if (searchCircle) map.removeLayer(searchCircle);
-
       destinationMarker = L.marker(latlng).addTo(map).bindPopup(result.display_name).openPopup();
       searchCircle = L.circle(latlng, { radius: 180, weight: 1, fillOpacity: 0.08 }).addTo(map);
 
+      const atm = classifyATM(latlng);
       const recommendations = getTopRecommendations(latlng, 3);
       renderRecommendations(recommendations, latlng);
-
-      const containing = findContainingArea(latlng);
-      if (containing) {
-        setSheet(containing, 'manual', 'La destinazione cercata cade dentro questa zona demo.');
-      } else {
-        const nearest = recommendations[0];
-        setCustomResult(
-          'Destinazione trovata',
-          result.display_name,
-          nearest?.area ? `zona vicina: ${nearest.area.name}` : 'destinazione trovata',
-          nearest?.area
-            ? `Ti propongo 3 zone candidate vicine. La più vicina è ${nearest.area.name} a circa ${Math.round(nearest.distance)} m.`
-            : 'Destinazione trovata, ma non ho ancora abbastanza aree per collegarla bene.',
-          nearest?.area
-            ? `Se dovessi partire ora, aprirei come prima candidata <strong>${nearest.area.name}</strong> e poi confronterei le altre due opzioni qui sotto.`
-            : 'Quando allargheremo il dataset, qui compariranno suggerimenti reali per le vie migliori da provare.'
-        );
-      }
-    } catch (error) {
+      renderAtmProfiles(atm.profileKeys);
       setCustomResult(
-        'Ricerca temporaneamente non disponibile',
-        'Il servizio di geocoding non ha risposto.',
-        'r
+        'Destinazione trovata',
+        result.display_name,
+        atm.macro,
+        `${atm.note} Ti mostro anche le tariffe ATM ufficiali compatibili con questa macro-area e 3 aree strategiche vicine.`,
+        recommendations[0]?.area ? `Se dovessi partire ora, confronterei prima <strong>${recommendations[0].area.name}</strong>, poi le altre due opzioni.` : ''
+      );
+    } catch (error) {
+      setCustomResult('Ricerca temporaneamente non disponibile', 'Il servizio di geocoding non ha risposto.', '—', 'Controlla la connessione o riprova tra poco.');
+      hideRecommendations();
+      hideAtmBox();
+    } finally {
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Vai';
+    }
+  }
+
+  function handleGpsPosition(latlng, accuracy = 40) {
+    map.setView(latlng, 15);
+    if (myMarker) map.removeLayer(myMarker);
+    if (myCircle) map.removeLayer(myCircle);
+    myMarker = L.marker(latlng).addTo(map).bindPopup('Sei qui');
+    myCircle = L.circle(latlng, { radius: accuracy }).addTo(map);
+    const atm = classifyATM(latlng);
+    const recommendations = getTopRecommendations(latlng, 3);
+    renderRecommendations(recommendations, latlng);
+    renderAtmProfiles(atm.profileKeys);
+    setCustomResult('Posizione rilevata', 'Sei qui adesso.', atm.macro, `${atm.note} Ti mostro 3 aree strategiche attorno alla tua posizione e le regole ATM della macro-area stimata.`, recommendations[0]?.area ? `Per iniziare guarderei <strong>${recommendations[0].area.name}</strong>.` : '');
+  }
+
+  const allBounds = cityBounds.pad(0.03);
+  map.fitBounds(allBounds);
+
+  searchBtn.addEventListener('click', searchRealAddress);
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      searchRealAddress();
+    }
+  });
+
+  locateBtn.addEventListener('click', () => {
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      setCustomResult('GPS bloccato', 'Su Android il GPS nel browser funziona bene in https.', '—', 'La tua pagina deve essere servita in https oppure da localhost.');
+      hideRecommendations();
+      hideAtmBox();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => handleGpsPosition(L.latLng(pos.coords.latitude, pos.coords.longitude), pos.coords.accuracy || 40),
+      err => {
+        const messages = {
+          1: 'Permesso negato. Devi consentire la posizione al browser.',
+          2: 'Posizione non disponibile.',
+          3: 'Tempo scaduto nella richiesta GPS.'
+        };
+        setCustomResult('Errore GPS', messages[err.code] || 'Errore sconosciuto.', '—', 'Controlla i permessi del browser.');
+        hideRecommendations();
+        hideAtmBox();
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+
+  strategySelect.addEventListener('change', () => {
+    const latlng = destinationMarker ? destinationMarker.getLatLng() : (myMarker ? myMarker.getLatLng() : null);
+    if (!latlng) return;
+    const recommendations = getTopRecommendations(latlng, 3);
+    renderRecommendations(recommendations, latlng);
+    showBanner(`Strategia aggiornata: ${strategySelect.value}.`);
+  });
+
+  document.getElementById('parkBtn').addEventListener('click', saveCar);
+  document.getElementById('goToCarBtn').addEventListener('click', goToCar);
+  document.getElementById('fitZonesBtn').addEventListener('click', () => {
+    map.fitBounds(allBounds);
+    hideRecommendations();
+  });
+  document.getElementById('studyBtn').addEventListener('click', () => {
+    showBanner(`Modalità attiva: ${strategySelect.value}. Usa la scheda ATM e le 3 aree suggerite per scegliere dove tentare prima.`);
+  });
+  sheetToggleBtn.addEventListener('click', toggleSheet);
+  sheetGrabber.addEventListener('click', toggleSheet);
+
+  renderSavedCar();
+  setWelcome();
+</script>
+</body>
+</html>
