@@ -126,7 +126,7 @@
       border-radius: 24px;
       box-shadow: var(--shadow);
       padding: 14px;
-      max-height: 44vh;
+      max-height: 52vh;
       overflow: auto;
     }
 
@@ -224,14 +224,58 @@
       display: none;
     }
 
-    .hidden { display: none; }
+    .recommendations {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
 
+    .recCard {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 12px;
+      cursor: pointer;
+    }
+
+    .recTop {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 6px;
+    }
+
+    .recTitle {
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .recMeta {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .recTag {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .hidden { display: none; }
     .leaflet-popup-content { font-size: 14px; }
 
     @media (min-width: 900px) {
       .topbar { left: 16px; right: auto; width: 430px; }
       .sheet { right: 16px; left: auto; width: 430px; background: none; padding: 0; bottom: 16px; }
-      .sheetCard { max-height: 62vh; }
+      .sheetCard { max-height: 72vh; }
       .fabStack { right: 460px; bottom: 24px; }
     }
   </style>
@@ -246,7 +290,7 @@
     </div>
     <div class="searchRow">
       <div class="searchWrap">
-        <input id="searchInput" list="presetAreas" placeholder="Destinazione: Duomo, Centrale, Navigli..." />
+        <input id="searchInput" list="presetAreas" placeholder="Destinazione: via, piazza o zona..." />
         <button id="searchBtn" class="btn-primary btn-small">Vai</button>
       </div>
       <button id="locateBtn" class="btn-soft">GPS</button>
@@ -295,6 +339,7 @@
 
       <div id="noticeBox" class="notice">Nella versione completa qui leggerai regole ATM, residenti, orari, pagamento e consigli di ricerca via per via.</div>
       <div id="planBox" class="planCard hidden"></div>
+      <div id="recommendationsBox" class="recommendations hidden"></div>
       <div id="savedBanner" class="savedBanner"></div>
     </div>
   </div>
@@ -454,6 +499,7 @@
   const strategyText = document.getElementById('strategyText');
   const noticeBox = document.getElementById('noticeBox');
   const planBox = document.getElementById('planBox');
+  const recommendationsBox = document.getElementById('recommendationsBox');
   const savedBanner = document.getElementById('savedBanner');
   const searchInput = document.getElementById('searchInput');
   const searchBtn = document.getElementById('searchBtn');
@@ -477,6 +523,59 @@
         savedBanner.style.display = 'none';
       }, 3500);
     }
+  }
+
+  function hideRecommendations() {
+    recommendationsBox.innerHTML = '';
+    recommendationsBox.classList.add('hidden');
+  }
+
+  function renderRecommendations(items, destinationLatLng) {
+    if (!items || !items.length) {
+      hideRecommendations();
+      return;
+    }
+
+    recommendationsBox.innerHTML = '';
+    const labels = ['Prima scelta', 'Alternativa', 'Piano B'];
+
+    items.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'recCard';
+      card.innerHTML = `
+        <div class="recTop">
+          <div>
+            <div class="recTitle">${item.area.name}</div>
+            <div class="recMeta">${item.area.parkingType} · ${Math.round(item.distance)} m dalla destinazione</div>
+          </div>
+          <span class="recTag">${labels[index] || 'Opzione'}</span>
+        </div>
+        <div class="recMeta"><strong>Strategia:</strong> ${item.area.strategy}</div>
+        <div class="recMeta">${item.area.tip}</div>
+      `;
+
+      card.addEventListener('click', () => {
+        setSheet(item.area, 'manual', `Questa è una delle zone consigliate vicino alla destinazione.`);
+        const bounds = L.latLngBounds([]);
+        item.area.coords.forEach(c => bounds.extend(c));
+        bounds.extend(destinationLatLng);
+        map.fitBounds(bounds.pad(0.25));
+      });
+
+      recommendationsBox.appendChild(card);
+    });
+
+    recommendationsBox.classList.remove('hidden');
+  }
+
+  function getTopRecommendations(latlng, limit = 3) {
+    return areas
+      .map(area => ({
+        area,
+        distance: map.distance(latlng, L.latLng(area.center[0], area.center[1]))
+      }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, limit);
   }
 
   function setSheet(area, mode = 'manual', extra = '') {
@@ -518,6 +617,7 @@
     strategyText.textContent = '—';
     noticeBox.textContent = 'Versione prototipo: poche zone demo, ma già pensata per l’uso reale su Android.';
     planBox.classList.add('hidden');
+    hideRecommendations();
   }
 
   function saveCar() {
@@ -563,7 +663,6 @@
 
     const addressPattern = new RegExp('(via|viale|piazza|piazzale|corso|largo|vicolo|naviglio|alzaia)', 'i');
     const looksLikeAddress = /\d/.test(q) || addressPattern.test(q) || q.includes(',');
-
     if (looksLikeAddress) return null;
 
     return areas.find(area =>
@@ -602,6 +701,7 @@
     if (localArea) {
       setSheet(localArea);
       map.setView(localArea.center, 14);
+      hideRecommendations();
       return;
     }
 
@@ -625,9 +725,7 @@
       for (const candidate of candidates) {
         const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&countrycodes=it&q=${encodeURIComponent(candidate)}`;
         const response = await fetch(url, {
-          headers: {
-            'Accept': 'application/json'
-          }
+          headers: { 'Accept': 'application/json' }
         });
 
         if (!response.ok) continue;
@@ -652,6 +750,7 @@
           'prova indirizzo completo',
           'Scrivi via e numero civico, ad esempio “Via Torino 32, Milano”, oppure una zona come “Navigli”.'
         );
+        hideRecommendations();
         return;
       }
 
@@ -664,20 +763,23 @@
       destinationMarker = L.marker(latlng).addTo(map).bindPopup(result.display_name).openPopup();
       searchCircle = L.circle(latlng, { radius: 180, weight: 1, fillOpacity: 0.08 }).addTo(map);
 
+      const recommendations = getTopRecommendations(latlng, 3);
+      renderRecommendations(recommendations, latlng);
+
       const containing = findContainingArea(latlng);
       if (containing) {
         setSheet(containing, 'manual', 'La destinazione cercata cade dentro questa zona demo.');
       } else {
-        const nearest = findNearestArea(latlng);
+        const nearest = recommendations[0];
         setCustomResult(
           'Destinazione trovata',
           result.display_name,
-          nearest.area ? `zona vicina: ${nearest.area.name}` : 'destinazione trovata',
-          nearest.area
-            ? `Questa destinazione non è dentro una zona demo, ma la zona campione più vicina è ${nearest.area.name} a circa ${Math.round(nearest.distance)} m.`
+          nearest?.area ? `zona vicina: ${nearest.area.name}` : 'destinazione trovata',
+          nearest?.area
+            ? `Ti propongo 3 zone candidate vicine. La più vicina è ${nearest.area.name} a circa ${Math.round(nearest.distance)} m.`
             : 'Destinazione trovata, ma non ho ancora abbastanza aree per collegarla bene.',
-          nearest.area
-            ? `Se dovessi partire ora, aprirei come prima candidata <strong>${nearest.area.name}</strong> e preparerei almeno una seconda area vicina.`
+          nearest?.area
+            ? `Se dovessi partire ora, aprirei come prima candidata <strong>${nearest.area.name}</strong> e poi confronterei le altre due opzioni qui sotto.`
             : 'Quando allargheremo il dataset, qui compariranno suggerimenti reali per le vie migliori da provare.'
         );
       }
@@ -688,6 +790,7 @@
         'riprovare',
         'Controlla la connessione o riprova tra poco. La logica della webapp è pronta; questa parte usa un servizio online.'
       );
+      hideRecommendations();
     } finally {
       searchBtn.disabled = false;
       searchBtn.textContent = 'Vai';
@@ -705,6 +808,7 @@
     polygon.bindTooltip(area.name);
     polygon.on('click', () => {
       setSheet(area);
+      hideRecommendations();
       map.fitBounds(polygon.getBounds(), { padding: [28, 28] });
     });
   });
@@ -730,6 +834,7 @@
       strategyText.textContent = 'pubblicare PWA';
       noticeBox.textContent = 'Quando la metteremo online o la lancerai in locale con un piccolo server, il GPS funzionerà correttamente.';
       planBox.classList.add('hidden');
+      hideRecommendations();
       return;
     }
 
@@ -745,16 +850,19 @@
         myCircle = L.circle(latlng, { radius: pos.coords.accuracy }).addTo(map);
 
         const hit = findContainingArea(latlng);
+        const recommendations = getTopRecommendations(latlng, 3);
+        renderRecommendations(recommendations, latlng);
+
         if (hit) {
           setSheet(hit, 'gps');
         } else {
-          const nearest = findNearestArea(latlng);
-          if (nearest.area) {
+          const nearest = recommendations[0];
+          if (nearest?.area) {
             setCustomResult(
               'Posizione rilevata',
               'Sei fuori dalle zone demo del prototipo.',
               `più vicina: ${nearest.area.name}`,
-              `La zona demo più vicina è ${nearest.area.name} a circa ${Math.round(nearest.distance)} m.`,
+              `Ti propongo 3 zone candidate attorno alla tua posizione. La più vicina è ${nearest.area.name} a circa ${Math.round(nearest.distance)} m.`,
               'Quando estenderemo il dataset a tutta Milano, qui vedrai subito l’ambito corretto e i consigli di parcheggio reali.'
             );
           } else {
@@ -781,6 +889,7 @@
         strategyText.textContent = 'controlla permessi';
         noticeBox.textContent = 'Quando la trasformeremo in PWA, l’esperienza sarà molto più simile a una vera app.';
         planBox.classList.add('hidden');
+        hideRecommendations();
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -788,7 +897,10 @@
 
   document.getElementById('parkBtn').addEventListener('click', saveCar);
   document.getElementById('goToCarBtn').addEventListener('click', goToCar);
-  document.getElementById('fitZonesBtn').addEventListener('click', () => map.fitBounds(bounds.pad(0.15)));
+  document.getElementById('fitZonesBtn').addEventListener('click', () => {
+    map.fitBounds(bounds.pad(0.15));
+    hideRecommendations();
+  });
   document.getElementById('studyBtn').addEventListener('click', () => {
     if (!currentArea) {
       showBanner('Prima seleziona una zona o cerca una destinazione.');
