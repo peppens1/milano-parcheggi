@@ -1,123 +1,633 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Milano Parcheggi</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-<style>
-body,html{margin:0;height:100%;font-family:system-ui}
-#map{height:100%}
-.panel{
-position:absolute;top:10px;left:10px;z-index:1000;
-background:white;padding:10px;border-radius:10px;
-box-shadow:0 4px 12px rgba(0,0,0,0.2);width:260px
-}
-input{width:100%;padding:6px;margin-bottom:6px}
-button{padding:6px 10px;margin-top:4px}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Milano Parcheggi · Ambiti ATM</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <style>
+    :root {
+      --bg: #e2e8f0;
+      --card: rgba(255,255,255,0.97);
+      --text: #0f172a;
+      --muted: #475569;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green-soft: #dcfce7;
+      --gray-soft: #e2e8f0;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    body { overflow: hidden; }
+    #map { position: fixed; inset: 0; }
+
+    .topbar {
+      position: fixed; top: 12px; left: 12px; right: 12px; z-index: 1000;
+      display: grid; gap: 10px; padding: 14px; border-radius: 22px;
+      background: rgba(15, 23, 42, 0.9); color: white; box-shadow: var(--shadow); backdrop-filter: blur(10px);
+    }
+    .title { font-size: 18px; font-weight: 800; line-height: 1.1; }
+    .subtitle { font-size: 13px; color: rgba(255,255,255,0.82); }
+    .searchRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .searchWrap {
+      display: grid; grid-template-columns: 1fr auto; gap: 8px; background: rgba(255,255,255,0.96);
+      border-radius: 16px; padding: 8px;
+    }
+    input, select {
+      width: 100%; border: 0; outline: none; background: transparent; color: var(--text);
+      font-size: 15px; padding: 8px 6px;
+    }
+    button {
+      border: 0; border-radius: 14px; padding: 11px 14px; font-size: 14px; font-weight: 700;
+      cursor: pointer; background: white; color: var(--text);
+    }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-soft { background: rgba(255,255,255,0.16); color: white; }
+    .btn-small { padding: 9px 12px; }
+
+    .fabStack {
+      position: fixed; right: 12px; bottom: 220px; z-index: 1000; display: grid; gap: 10px;
+    }
+    .fab {
+      width: 52px; height: 52px; border-radius: 999px; box-shadow: var(--shadow); background: white;
+      color: var(--text); display: grid; place-items: center; font-size: 20px;
+    }
+
+    .sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; padding: 10px 10px 16px;
+      background: linear-gradient(to top, rgba(226,232,240,1), rgba(226,232,240,0.88) 70%, rgba(226,232,240,0)); pointer-events: none;
+    }
+    .sheetCard {
+      pointer-events: auto; background: var(--card); border-radius: 24px; box-shadow: var(--shadow); padding: 14px;
+      max-height: 60vh; overflow: auto; transition: max-height 0.22s ease;
+    }
+    .sheetCard.collapsed { max-height: 94px; overflow: hidden; }
+    .grabber { width: 44px; height: 5px; border-radius: 999px; background: #cbd5e1; margin: 0 auto 12px; cursor: pointer; }
+    .sheetHeaderRow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .sheetToggle { border: 1px solid #e2e8f0; background: #f8fafc; color: var(--text); padding: 8px 10px; border-radius: 12px; font-size: 12px; font-weight: 800; }
+    .sheetBody.hiddenBody { display: none; }
+    .sectionTitle { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 8px; }
+    .sectionTitle h2 { margin: 0; font-size: 20px; line-height: 1.1; }
+
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .pill-blue { background: var(--blue-soft); color: #1d4ed8; }
+    .pill-green { background: var(--green-soft); color: #166534; }
+    .pill-gray { background: var(--gray-soft); color: #334155; }
+
+    .muted { color: var(--muted); font-size: 14px; line-height: 1.35; }
+    .infoGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+    .miniCard, .notice, .atmCard, .recCard {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px;
+    }
+    .miniLabel { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .miniValue { font-size: 14px; font-weight: 700; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .notice, .atmCard { margin-top: 10px; font-size: 13px; color: var(--muted); }
+    .atmCard strong { display: block; margin-bottom: 6px; color: var(--text); }
+    .savedBanner { margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: var(--green-soft); color: #166534; font-size: 13px; font-weight: 700; display: none; }
+    .recommendations { margin-top: 12px; display: grid; gap: 10px; }
+    .recCard { cursor: pointer; }
+    .recTop { display: flex; justify-content: space-between; gap: 10px; align-items: start; margin-bottom: 6px; }
+    .recTitle { font-size: 15px; font-weight: 800; line-height: 1.2; }
+    .recMeta { color: var(--muted); font-size: 13px; line-height: 1.35; }
+    .recTag { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .hidden { display: none; }
+
+    @media (min-width: 900px) {
+      .topbar { left: 16px; right: auto; width: 430px; }
+      .sheet { right: 16px; left: auto; width: 430px; background: none; padding: 0; bottom: 16px; }
+      .sheetCard { max-height: 76vh; }
+      .fabStack { right: 460px; bottom: 24px; }
+    }
+  </style>
 </head>
-
 <body>
+  <div id="map"></div>
 
-<div id="map"></div>
+  <div class="topbar">
+    <div>
+      <div class="title">Milano Parcheggi · Ambiti ATM</div>
+      <div class="subtitle">Questa versione legge il GeoJSON ufficiale degli ambiti di sosta da <code>data/ambiti_sosta.geojson</code>.</div>
+    </div>
+    <div class="searchRow">
+      <div class="searchWrap">
+        <input id="searchInput" placeholder="Destinazione: via, piazza o zona..." />
+        <button id="searchBtn" class="btn-primary btn-small">Vai</button>
+      </div>
+      <button id="locateBtn" class="btn-soft">GPS</button>
+    </div>
+    <div class="searchWrap" style="grid-template-columns:1fr;">
+      <select id="strategySelect">
+        <option value="equilibrato">Strategia: Equilibrato</option>
+        <option value="vicino">Strategia: Vicino alla destinazione</option>
+        <option value="facile">Strategia: Parcheggio facile</option>
+      </select>
+    </div>
+  </div>
 
-<div class="panel">
-<input id="searchInput" placeholder="Via e numero civico">
-<button onclick="searchAddress()">Cerca</button>
-<div id="result">Caricamento ambiti...</div>
-</div>
+  <div class="fabStack">
+    <button id="fitZonesBtn" class="fab" title="Vista Milano">⌂</button>
+    <button id="goToCarBtn" class="fab" title="Torna all'auto">🚗</button>
+  </div>
 
-<script>
+  <div class="sheet">
+    <div id="sheetCard" class="sheetCard">
+      <div id="sheetGrabber" class="grabber"></div>
+      <div class="sheetHeaderRow">
+        <div class="muted" style="font-size:12px; font-weight:700;">Pannello ambito</div>
+        <button id="sheetToggleBtn" class="sheetToggle">Riduci</button>
+      </div>
+      <div id="sheetBody" class="sheetBody">
+        <div class="sectionTitle">
+          <h2 id="zoneTitle">Caricamento…</h2>
+          <span id="zoneBadge" class="pill pill-gray">geojson</span>
+        </div>
+        <div id="zoneText" class="muted">Sto caricando gli ambiti ufficiali della sosta.</div>
 
-const map=L.map("map").setView([45.4642,9.19],12);
+        <div class="infoGrid">
+          <div class="miniCard">
+            <div class="miniLabel">Ambito</div>
+            <div id="parkingType" class="miniValue">—</div>
+          </div>
+          <div class="miniCard">
+            <div class="miniLabel">Strategia</div>
+            <div id="strategyText" class="miniValue">—</div>
+          </div>
+        </div>
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-maxZoom:19,
-attribution:"© OpenStreetMap"
-}).addTo(map);
+        <div class="actions">
+          <button id="parkBtn" class="btn-primary">Ho parcheggiato</button>
+          <button id="studyBtn">Studia zona</button>
+        </div>
 
-let geojsonData=null;
-let ambitiLayer=null;
-let marker=null;
+        <div id="noticeBox" class="notice">Cerca un indirizzo per vedere l’ambito ufficiale, oppure usa il GPS.</div>
+        <div id="recommendationsBox" class="recommendations hidden"></div>
+        <div id="atmBox" class="hidden"></div>
+        <div id="savedBanner" class="savedBanner"></div>
+      </div>
+    </div>
+  </div>
 
-async function loadAmbiti(){
+  <script>
+    const map = L.map('map', { zoomControl: false }).setView([45.4642, 9.19], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-const r=await fetch("data/ambiti_sosta.geojson");
-geojsonData=await r.json();
+    const cityBounds = L.latLngBounds([[45.401, 9.05], [45.545, 9.31]]);
+    map.fitBounds(cityBounds.pad(0.03));
 
-ambitiLayer=L.geoJSON(geojsonData,{
-style:{
-color:"#2563eb",
-weight:1,
-fillOpacity:0.05
-}
-}).addTo(map);
+    const officialProfiles = {
+      areaC: { title: 'Area C', tariffa: '€ 3,00 / ora', quando: '08:00–19:00 / 19:00–24:00 con regole dedicate', dettagli: 'Max 2 ore diurne per codice.', codes: ['0123','0323','0423','0523','0623','0723'] },
+      filo_11: { title: 'Cerchia filoviaria · profilo 11', tariffa: '€ 2,00 / ora', quando: 'Feriali 08:00–19:00', dettagli: 'Profilo base filoviario.', codes: ['0211','0911','1011','1111','1211','1311','1411','1511','1611','1711','1811','1911','2011','2111','2211','2311'] },
+      extra_19: { title: 'Cerchia extra-filoviaria · profilo 19', tariffa: '€ 1,20 / ora', quando: 'Feriali 08:00–19:00', dettagli: 'Profilo base extra-filoviario.', codes: ['2519','3019','3119','3219','3319','3419','3519','3619','4019','4219','4319'] }
+    };
 
-document.getElementById("result").innerHTML="Ambiti caricati";
-}
+    const strategyAreas = [
+      { id: 'duomo', name: 'Duomo / Centro', parkingType: 'Area C', strategy: 'centro', color: '#2563eb', center: [45.4642, 9.1916], difficulty: 3, transitBonus: 2, plan: 'Molto vicino ma più stressante.' },
+      { id: 'cadorna', name: 'Cadorna / Castello', parkingType: 'Filoviaria', strategy: 'laterali utili', color: '#2563eb', center: [45.4700, 9.1795], difficulty: 2, transitBonus: 2, plan: 'Buon compromesso per il centro.' },
+      { id: 'centrale', name: 'Stazione Centrale', parkingType: 'Filoviaria', strategy: 'servono alternative', color: '#2563eb', center: [45.4855, 9.2044], difficulty: 3, transitBonus: 2, plan: 'Rotazione alta ma area densa.' },
+      { id: 'sansiro', name: 'San Siro / Lotto', parkingType: 'Extra-filoviaria', strategy: 'parcheggio + metro', color: '#16a34a', center: [45.4781, 9.1240], difficulty: 1, transitBonus: 3, plan: 'Ottima se preferisci meno stress.' },
+      { id: 'bicocca', name: 'Bicocca', parkingType: 'Extra-filoviaria', strategy: 'nord-est', color: '#16a34a', center: [45.5130, 9.2110], difficulty: 1, transitBonus: 3, plan: 'Comoda per approccio pratico.' },
+      { id: 'portaromana', name: 'Porta Romana', parkingType: 'Filoviaria', strategy: 'laterali', color: '#2563eb', center: [45.4528, 9.2020], difficulty: 2, transitBonus: 2, plan: 'Buon equilibrio tra accesso e stress.' }
+    ];
 
-function findAmbito(lat,lng){
+    const zoneTitle = document.getElementById('zoneTitle');
+    const zoneBadge = document.getElementById('zoneBadge');
+    const zoneText = document.getElementById('zoneText');
+    const parkingType = document.getElementById('parkingType');
+    const strategyText = document.getElementById('strategyText');
+    const noticeBox = document.getElementById('noticeBox');
+    const recommendationsBox = document.getElementById('recommendationsBox');
+    const atmBox = document.getElementById('atmBox');
+    const savedBanner = document.getElementById('savedBanner');
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const locateBtn = document.getElementById('locateBtn');
+    const strategySelect = document.getElementById('strategySelect');
+    const sheetCard = document.getElementById('sheetCard');
+    const sheetBody = document.getElementById('sheetBody');
+    const sheetToggleBtn = document.getElementById('sheetToggleBtn');
+    const sheetGrabber = document.getElementById('sheetGrabber');
 
-const pt=turf.point([lng,lat]);
+    let ambitiData = null;
+    let ambitiLayer = null;
+    let myMarker = null;
+    let myCircle = null;
+    let destinationMarker = null;
+    let savedCarMarker = null;
+    let sheetCollapsed = false;
 
-for(const f of geojsonData.features){
+    function setSheetCollapsed(collapsed) {
+      sheetCollapsed = collapsed;
+      sheetCard.classList.toggle('collapsed', collapsed);
+      sheetBody.classList.toggle('hiddenBody', collapsed);
+      sheetToggleBtn.textContent = collapsed ? 'Apri' : 'Riduci';
+    }
 
-if(turf.booleanPointInPolygon(pt,f)){
-return f;
-}
+    function toggleSheet() {
+      setSheetCollapsed(!sheetCollapsed);
+    }
 
-}
+    function showBanner(text, persistent = false) {
+      savedBanner.style.display = 'block';
+      savedBanner.textContent = text;
+      if (!persistent) {
+        clearTimeout(showBanner._timeout);
+        showBanner._timeout = setTimeout(() => {
+          savedBanner.style.display = 'none';
+        }, 3500);
+      }
+    }
 
-return null;
-}
+    function hideRecommendations() {
+      recommendationsBox.innerHTML = '';
+      recommendationsBox.classList.add('hidden');
+    }
 
-async function searchAddress(){
+    function hideAtmBox() {
+      atmBox.innerHTML = '';
+      atmBox.classList.add('hidden');
+    }
 
-const q=document.getElementById("searchInput").value;
+    function renderAtmBox(feature) {
+      const ambito = feature?.properties?.ambito ?? '—';
+      const nome = feature?.properties?.nome ?? 'Ambito senza nome';
+      const ambitoNum = Number(ambito);
 
-const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+", Milano")}`;
+      let profile = null;
+      if (!Number.isNaN(ambitoNum)) {
+        if (ambitoNum >= 1 && ambitoNum <= 7) profile = officialProfiles.areaC;
+        else if (ambitoNum >= 8 && ambitoNum <= 23) profile = officialProfiles.filo_11;
+        else profile = officialProfiles.extra_19;
+      }
 
-const r=await fetch(url);
-const j=await r.json();
+      if (!profile) {
+        hideAtmBox();
+        return;
+      }
 
-if(!j.length){
-alert("Indirizzo non trovato");
-return;
-}
+      atmBox.innerHTML = `
+        <div class="atmCard">
+          <strong>${nome} · ambito ${ambito}</strong>
+          <div class="recMeta"><strong>Profilo tariffario stimato:</strong> ${profile.title}</div>
+          <div class="recMeta"><strong>Tariffa:</strong> ${profile.tariffa}</div>
+          <div class="recMeta"><strong>Quando si paga:</strong> ${profile.quando}</div>
+          <div class="recMeta">${profile.dettagli}</div>
+          <div class="atmCodes"><strong>Codici ATM:</strong> ${profile.codes.join(', ')}</div>
+        </div>
+      `;
+      atmBox.classList.remove('hidden');
+    }
 
-const lat=parseFloat(j[0].lat);
-const lon=parseFloat(j[0].lon);
+    function setAmbitoResult(feature, extraText = '') {
+      const props = feature.properties || {};
+      zoneTitle.textContent = props.nome || 'Ambito ATM';
+      zoneBadge.textContent = `ambito ${props.ambito ?? '—'}`;
+      zoneBadge.className = 'pill pill-blue';
+      zoneText.textContent = 'La destinazione cade dentro questo ambito ufficiale della sosta.';
+      parkingType.textContent = props.ambito ?? '—';
+      strategyText.textContent = strategySelect.value;
+      noticeBox.textContent = extraText || 'Ora stai usando un ambito vero del GeoJSON ufficiale del Comune.';
+      renderAtmBox(feature);
+    }
 
-map.setView([lat,lon],16);
+    function getRecommendationScore(area, distance, mode) {
+      const difficultyPenalty = area.difficulty || 2;
+      const transitBonus = area.transitBonus || 2;
+      if (mode === 'vicino') return distance + difficultyPenalty * 240 - transitBonus * 35;
+      if (mode === 'facile') return distance * 0.65 + difficultyPenalty * 520 - transitBonus * 180;
+      return distance * 0.85 + difficultyPenalty * 320 - transitBonus * 110;
+    }
 
-if(marker) map.removeLayer(marker);
-marker=L.marker([lat,lon]).addTo(map);
+    function getTopRecommendations(latlng, limit = 3) {
+      const mode = strategySelect.value;
+      return strategyAreas
+        .map(area => {
+          const distance = map.distance(latlng, L.latLng(area.center[0], area.center[1]));
+          return { area, distance, score: getRecommendationScore(area, distance, mode) };
+        })
+        .sort((a, b) => a.score - b.score)
+        .slice(0, limit);
+    }
 
-const ambito=findAmbito(lat,lon);
+    function renderRecommendations(items, destinationLatLng) {
+      if (!items || !items.length) {
+        hideRecommendations();
+        return;
+      }
+      recommendationsBox.innerHTML = '';
+      const labels = ['Prima scelta', 'Alternativa', 'Piano B'];
+      const strategyMode = strategySelect.value;
 
-if(ambito){
+      items.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'recCard';
+        card.innerHTML = `
+          <div class="recTop">
+            <div>
+              <div class="recTitle">${item.area.name}</div>
+              <div class="recMeta">${item.area.parkingType} · ${Math.round(item.distance)} m dalla destinazione</div>
+            </div>
+            <span class="recTag">${labels[index]}</span>
+          </div>
+          <div class="recMeta"><strong>Strategia zona:</strong> ${item.area.strategy}</div>
+          <div class="recMeta"><strong>Modalità attiva:</strong> ${strategyMode}</div>
+          <div class="recMeta">${item.area.plan}</div>
+        `;
+        card.addEventListener('click', () => {
+          zoneTitle.textContent = item.area.name;
+          zoneBadge.textContent = 'strategica';
+          zoneBadge.className = 'pill pill-green';
+          zoneText.textContent = item.area.plan;
+          parkingType.textContent = item.area.parkingType;
+          strategyText.textContent = item.area.strategy;
+          noticeBox.textContent = 'Questa è una delle 3 aree strategiche suggerite vicino alla destinazione.';
+          const bounds = L.latLngBounds([]);
+          bounds.extend(destinationLatLng);
+          bounds.extend(item.area.center);
+          map.fitBounds(bounds.pad(0.25));
+        });
+        recommendationsBox.appendChild(card);
+      });
+      recommendationsBox.classList.remove('hidden');
+    }
 
-const nome=ambito.properties.nome||"Ambito";
-const num=ambito.properties.ambito||"?";
+    function findFeatureForLatLng(latlng) {
+      if (!ambitiData) return null;
+      const pt = turf.point([latlng.lng, latlng.lat]);
+      for (const feature of ambitiData.features) {
+        try {
+          if (turf.booleanPointInPolygon(pt, feature)) return feature;
+        } catch (e) {
+          // skip invalid geometry
+        }
+      }
+      return null;
+    }
 
-document.getElementById("result").innerHTML=
-"<b>"+nome+"</b><br>Ambito: "+num;
+    async function loadAmbiti() {
+      try {
+        const response = await fetch('data/ambiti_sosta.geojson');
+        if (!response.ok) throw new Error('geojson');
+        ambitiData = await response.json();
 
-}else{
+        ambitiLayer = L.geoJSON(ambitiData, {
+          style: {
+            color: '#2563eb',
+            weight: 1,
+            fillColor: '#2563eb',
+            fillOpacity: 0.06
+          },
+          onEachFeature: (feature, layer) => {
+            const props = feature.properties || {};
+            layer.bindTooltip(`${props.nome || 'Ambito'} (${props.ambito || '—'})`);
+            layer.on('click', () => {
+              setAmbitoResult(feature, 'Ambito selezionato direttamente dalla mappa.');
+              hideRecommendations();
+              map.fitBounds(layer.getBounds().pad(0.15));
+            });
+          }
+        }).addTo(map);
 
-document.getElementById("result").innerHTML=
-"Ambito non trovato";
+        zoneTitle.textContent = 'Ambiti caricati';
+        zoneBadge.textContent = 'ok';
+        zoneBadge.className = 'pill pill-green';
+        zoneText.textContent = 'Gli ambiti ufficiali sono stati caricati. Ora la ricerca userà il GeoJSON.';
+        parkingType.textContent = 'GeoJSON';
+        strategyText.textContent = strategySelect.value;
+        noticeBox.textContent = 'Puoi cercare un indirizzo o toccare direttamente un ambito.';
+      } catch (error) {
+        zoneTitle.textContent = 'GeoJSON mancante';
+        zoneBadge.textContent = 'errore';
+        zoneBadge.className = 'pill pill-gray';
+        zoneText.textContent = 'Non trovo data/ambiti_sosta.geojson nel repo.';
+        parkingType.textContent = '—';
+        strategyText.textContent = '—';
+        noticeBox.textContent = 'Carica il file nella cartella data e ricarica la pagina.';
+      }
+    }
 
-}
+    async function searchRealAddress() {
+      const query = searchInput.value.trim();
+      if (!query) {
+        showBanner('Scrivi un indirizzo o una zona.');
+        return;
+      }
 
-}
+      searchBtn.disabled = true;
+      searchBtn.textContent = '...';
 
-loadAmbiti();
+      try {
+        const normalized = /milano/i.test(query) ? query : `${query}, Milano, Italia`;
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&countrycodes=it&viewbox=9.05,45.545,9.31,45.401&bounded=1&q=${encodeURIComponent(normalized)}`;
 
-</script>
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) throw new Error('network');
+        const results = await response.json();
 
+        const milanoOnly = results.filter(r => {
+          const display = (r.display_name || '').toLowerCase();
+          const city = (r.address?.city || r.address?.town || r.address?.village || r.address?.municipality || '').toLowerCase();
+          const county = (r.address?.county || '').toLowerCase();
+          const state = (r.address?.state || '').toLowerCase();
+          return display.includes('milano') || city === 'milano' || county.includes('milano') || state.includes('lombardia');
+        });
+
+        const pool = milanoOnly;
+        const result =
+          pool.find(r => ['house', 'building'].includes(r.type)) ||
+          pool.find(r => ['residential', 'road', 'pedestrian', 'street'].includes(r.type)) ||
+          pool[0];
+
+        if (!result) {
+          zoneTitle.textContent = 'Indirizzo non trovato';
+          zoneBadge.textContent = 'Milano';
+          zoneBadge.className = 'pill pill-gray';
+          zoneText.textContent = 'Non ho trovato risultati utili dentro Milano.';
+          parkingType.textContent = '—';
+          strategyText.textContent = strategySelect.value;
+          noticeBox.textContent = 'Prova con via + numero civico, ad esempio “Via Gomes 4”.';
+          hideRecommendations();
+          hideAtmBox();
+          return;
+        }
+
+        const latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
+        map.setView(latlng, 16);
+
+        if (destinationMarker) map.removeLayer(destinationMarker);
+        if (searchCircle) map.removeLayer(searchCircle);
+
+        destinationMarker = L.marker(latlng).addTo(map).bindPopup(result.display_name).openPopup();
+        searchCircle = L.circle(latlng, { radius: 180, weight: 1, fillOpacity: 0.08 }).addTo(map);
+
+        const feature = findFeatureForLatLng(latlng);
+        if (feature) {
+          setAmbitoResult(feature, 'Indirizzo trovato dentro Milano e agganciato all’ambito ufficiale.');
+        } else {
+          zoneTitle.textContent = 'Destinazione trovata';
+          zoneBadge.textContent = 'fuori ambito';
+          zoneBadge.className = 'pill pill-gray';
+          zoneText.textContent = result.display_name;
+          parkingType.textContent = '—';
+          strategyText.textContent = strategySelect.value;
+          noticeBox.textContent = 'Ho trovato l’indirizzo, ma non sono riuscito ad associarlo a un poligono del GeoJSON.';
+          hideAtmBox();
+        }
+
+        renderRecommendations(getTopRecommendations(latlng, 3), latlng);
+      } catch (error) {
+        zoneTitle.textContent = 'Ricerca temporaneamente non disponibile';
+        zoneBadge.textContent = 'errore';
+        zoneBadge.className = 'pill pill-gray';
+        zoneText.textContent = 'Il servizio di geocoding non ha risposto.';
+        parkingType.textContent = '—';
+        strategyText.textContent = strategySelect.value;
+        noticeBox.textContent = 'Controlla la connessione o riprova tra poco.';
+        hideRecommendations();
+        hideAtmBox();
+      } finally {
+        searchBtn.disabled = false;
+        searchBtn.textContent = 'Vai';
+      }
+    }
+
+    function handleGpsPosition(latlng, accuracy = 40) {
+      map.setView(latlng, 15);
+
+      if (myMarker) map.removeLayer(myMarker);
+      if (myCircle) map.removeLayer(myCircle);
+
+      myMarker = L.marker(latlng).addTo(map).bindPopup('Sei qui');
+      myCircle = L.circle(latlng, { radius: accuracy }).addTo(map);
+
+      const feature = findFeatureForLatLng(latlng);
+      if (feature) {
+        setAmbitoResult(feature, 'Posizione attuale agganciata all’ambito ufficiale.');
+      } else {
+        zoneTitle.textContent = 'Posizione rilevata';
+        zoneBadge.textContent = 'GPS';
+        zoneBadge.className = 'pill pill-green';
+        zoneText.textContent = 'Sei qui adesso.';
+        parkingType.textContent = '—';
+        strategyText.textContent = strategySelect.value;
+        noticeBox.textContent = 'Ho rilevato la posizione ma non ho trovato un poligono corrispondente.';
+        hideAtmBox();
+      }
+
+      renderRecommendations(getTopRecommendations(latlng, 3), latlng);
+    }
+
+    function saveCar() {
+      const latlng = myMarker ? myMarker.getLatLng() : (destinationMarker ? destinationMarker.getLatLng() : null);
+      if (!latlng) {
+        showBanner('Prima usa GPS o cerca una destinazione.');
+        return;
+      }
+      localStorage.setItem('milanoParcheggiCar', JSON.stringify({
+        lat: latlng.lat,
+        lng: latlng.lng,
+        savedAt: new Date().toISOString()
+      }));
+      renderSavedCar();
+      showBanner('Posizione auto salvata sul dispositivo.');
+    }
+
+    function renderSavedCar() {
+      const raw = localStorage.getItem('milanoParcheggiCar');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      const latlng = [data.lat, data.lng];
+      if (savedCarMarker) map.removeLayer(savedCarMarker);
+      savedCarMarker = L.marker(latlng).addTo(map).bindPopup('Auto salvata qui');
+    }
+
+    function goToCar() {
+      const raw = localStorage.getItem('milanoParcheggiCar');
+      if (!raw) {
+        showBanner('Non hai ancora salvato la posizione dell’auto.');
+        return;
+      }
+      const data = JSON.parse(raw);
+      map.setView([data.lat, data.lng], 16);
+      if (savedCarMarker) savedCarMarker.openPopup();
+      showBanner('Ti ho riportato al punto in cui hai salvato l’auto.');
+    }
+
+    searchBtn.addEventListener('click', searchRealAddress);
+    searchInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        searchRealAddress();
+      }
+    });
+
+    locateBtn.addEventListener('click', () => {
+      if (!window.isSecureContext && location.hostname !== 'localhost') {
+        zoneTitle.textContent = 'GPS bloccato';
+        zoneBadge.textContent = 'https';
+        zoneBadge.className = 'pill pill-gray';
+        zoneText.textContent = 'Su Android il GPS nel browser funziona bene in https.';
+        parkingType.textContent = '—';
+        strategyText.textContent = strategySelect.value;
+        noticeBox.textContent = 'La tua pagina deve essere servita in https oppure da localhost.';
+        hideRecommendations();
+        hideAtmBox();
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        pos => handleGpsPosition(L.latLng(pos.coords.latitude, pos.coords.longitude), pos.coords.accuracy || 40),
+        err => {
+          const messages = {
+            1: 'Permesso negato. Devi consentire la posizione al browser.',
+            2: 'Posizione non disponibile.',
+            3: 'Tempo scaduto nella richiesta GPS.'
+          };
+          zoneTitle.textContent = 'Errore GPS';
+          zoneBadge.textContent = 'permessi';
+          zoneBadge.className = 'pill pill-gray';
+          zoneText.textContent = messages[err.code] || 'Errore sconosciuto.';
+          parkingType.textContent = '—';
+          strategyText.textContent = strategySelect.value;
+          noticeBox.textContent = 'Controlla i permessi del browser.';
+          hideRecommendations();
+          hideAtmBox();
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+
+    strategySelect.addEventListener('change', () => {
+      const latlng = destinationMarker ? destinationMarker.getLatLng() : (myMarker ? myMarker.getLatLng() : null);
+      if (!latlng) return;
+      renderRecommendations(getTopRecommendations(latlng, 3), latlng);
+      showBanner(`Strategia aggiornata: ${strategySelect.value}.`);
+    });
+
+    document.getElementById('parkBtn').addEventListener('click', saveCar);
+    document.getElementById('goToCarBtn').addEventListener('click', goToCar);
+    document.getElementById('fitZonesBtn').addEventListener('click', () => {
+      map.fitBounds(cityBounds.pad(0.03));
+      hideRecommendations();
+    });
+    document.getElementById('studyBtn').addEventListener('click', () => {
+      showBanner(`Modalità attiva: ${strategySelect.value}. Usa ambito ufficiale e 3 aree strategiche per decidere dove provare.`);
+    });
+    sheetToggleBtn.addEventListener('click', toggleSheet);
+    sheetGrabber.addEventListener('click', toggleSheet);
+
+    renderSavedCar();
+    setWelcome();
+    loadAmbiti();
+  </script>
 </body>
 </html>
