@@ -22,6 +22,7 @@
       --green-soft: #dcfce7;
       --yellow: #ca8a04;
       --yellow-soft: #fef3c7;
+      --red: #dc2626;
       --gray-soft: #e2e8f0;
       --shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
     }
@@ -81,7 +82,7 @@
       padding: 8px 6px;
     }
 
-    button {
+    button, a.actionLink {
       border: 0;
       border-radius: 14px;
       padding: 11px 14px;
@@ -90,6 +91,10 @@
       cursor: pointer;
       background: white;
       color: var(--text);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .btn-primary { background: var(--blue); color: white; }
@@ -134,7 +139,7 @@
       border-radius: 24px;
       box-shadow: var(--shadow);
       padding: 14px;
-      max-height: 60vh;
+      max-height: 64vh;
       overflow: auto;
       transition: max-height 0.22s ease;
     }
@@ -212,7 +217,7 @@
       margin: 12px 0;
     }
 
-    .miniCard, .notice, .planCard, .atmCard, .recCard {
+    .miniCard, .notice, .planCard, .atmCard, .recCard, .historyCard {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 16px;
@@ -221,8 +226,8 @@
 
     .miniLabel { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
     .miniValue { font-size: 14px; font-weight: 700; }
-    .notice, .planCard, .atmCard { margin-top: 10px; }
-    .atmCard strong, .planCard strong { display: block; margin-bottom: 6px; }
+    .notice, .planCard, .atmCard, .historyCard { margin-top: 10px; }
+    .atmCard strong, .planCard strong, .historyCard strong { display: block; margin-bottom: 6px; }
 
     .actions {
       display: grid;
@@ -271,6 +276,13 @@
       white-space: nowrap;
     }
 
+    .actionRow {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
     .atmCodes {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 12px;
@@ -278,12 +290,26 @@
       color: #334155;
     }
 
+    .historyList {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .historyItem {
+      padding: 10px;
+      border-radius: 12px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      font-size: 13px;
+    }
+
     .hidden { display: none; }
 
     @media (min-width: 900px) {
       .topbar { left: 16px; right: auto; width: 430px; }
       .sheet { right: 16px; left: auto; width: 430px; background: none; padding: 0; bottom: 16px; }
-      .sheetCard { max-height: 76vh; }
+      .sheetCard { max-height: 82vh; }
       .fabStack { right: 460px; bottom: 24px; }
     }
   </style>
@@ -294,7 +320,7 @@
   <div class="topbar">
     <div>
       <div class="title">Milano Parcheggi · Ambiti ATM</div>
-      <div class="subtitle">Ricerca solo dentro Milano, ambito ufficiale da GeoJSON, 3 ambiti vicini alla destinazione e pannello riducibile.</div>
+      <div class="subtitle">Ricerca solo dentro Milano, ambito ufficiale da GeoJSON, 3 ambiti vicini, cronologia e navigazione rapida.</div>
     </div>
 
     <div class="searchRow">
@@ -317,6 +343,8 @@
   <div class="fabStack">
     <button id="fitZonesBtn" class="fab" title="Vista Milano">⌂</button>
     <button id="goToCarBtn" class="fab" title="Torna all'auto">🚗</button>
+    <button id="goToDestBtn" class="fab" title="Torna alla destinazione">📍</button>
+    <button id="goToMeBtn" class="fab" title="Torna a me">◎</button>
   </div>
 
   <div class="sheet">
@@ -355,6 +383,7 @@
         <div id="planBox" class="planCard hidden"></div>
         <div id="recommendationsBox" class="recommendations hidden"></div>
         <div id="atmBox" class="atmBox hidden"></div>
+        <div id="historyBox" class="historyCard hidden"></div>
         <div id="savedBanner" class="savedBanner"></div>
       </div>
     </div>
@@ -377,21 +406,24 @@
         tariffa: '€ 3,00 / ora',
         quando: '08:00–19:00 / 19:00–24:00 con regole dedicate',
         dettagli: 'Max 2 ore diurne per codice.',
-        codes: ['0123','0323','0423','0523','0623','0723']
+        codes: ['0123','0323','0423','0523','0623','0723'],
+        group: 'Area C'
       },
       filo_11: {
         title: 'Cerchia filoviaria · profilo 11',
         tariffa: '€ 2,00 / ora',
         quando: 'Feriali 08:00–19:00',
         dettagli: 'Profilo base filoviario.',
-        codes: ['0211','0911','1011','1111','1211','1311','1411','1511','1611','1711','1811','1911','2011','2111','2211','2311']
+        codes: ['0211','0911','1011','1111','1211','1311','1411','1511','1611','1711','1811','1911','2011','2111','2211','2311'],
+        group: 'Cerchia filoviaria'
       },
       extra_19: {
         title: 'Cerchia extra-filoviaria · profilo 19',
         tariffa: '€ 1,20 / ora',
         quando: 'Feriali 08:00–19:00',
         dettagli: 'Profilo base extra-filoviario.',
-        codes: ['2519','3019','3119','3219','3319','3419','3519','3619','4019','4219','4319']
+        codes: ['2519','3019','3119','3219','3319','3419','3519','3619','4019','4219','4319'],
+        group: 'Cerchia extra-filoviaria'
       }
     };
 
@@ -404,6 +436,7 @@
     const planBox = document.getElementById('planBox');
     const recommendationsBox = document.getElementById('recommendationsBox');
     const atmBox = document.getElementById('atmBox');
+    const historyBox = document.getElementById('historyBox');
     const savedBanner = document.getElementById('savedBanner');
     const searchInput = document.getElementById('searchInput');
     const searchBtn = document.getElementById('searchBtn');
@@ -413,6 +446,8 @@
     const sheetBody = document.getElementById('sheetBody');
     const sheetToggleBtn = document.getElementById('sheetToggleBtn');
     const sheetGrabber = document.getElementById('sheetGrabber');
+    const goToDestBtn = document.getElementById('goToDestBtn');
+    const goToMeBtn = document.getElementById('goToMeBtn');
 
     let ambitiData = null;
     let ambitiLayer = null;
@@ -422,7 +457,11 @@
     let searchCircle = null;
     let savedCarMarker = null;
     let highlightedLayer = null;
+    let suggestedLayer = null;
+    let searchedRoadLayer = null;
     let sheetCollapsed = false;
+    let lastDestination = null;
+    let lastMyPosition = null;
 
     function setSheetCollapsed(collapsed) {
       sheetCollapsed = collapsed;
@@ -449,6 +488,10 @@
     function hideRecommendations() {
       recommendationsBox.innerHTML = '';
       recommendationsBox.classList.add('hidden');
+      if (suggestedLayer) {
+        map.removeLayer(suggestedLayer);
+        suggestedLayer = null;
+      }
     }
 
     function hideAtmBox() {
@@ -456,23 +499,51 @@
       atmBox.classList.add('hidden');
     }
 
+    function renderHistoryBox() {
+      const raw = localStorage.getItem('milanoParcheggiHistory');
+      if (!raw) {
+        historyBox.classList.add('hidden');
+        historyBox.innerHTML = '';
+        return;
+      }
+      const history = JSON.parse(raw);
+      if (!history.length) {
+        historyBox.classList.add('hidden');
+        historyBox.innerHTML = '';
+        return;
+      }
+      historyBox.innerHTML = `<strong>Cronologia recente</strong><div class="historyList">${history.slice(0,5).map(item => `<div class="historyItem"><div><strong>${item.label}</strong></div><div>${item.subtitle || ''}</div><div class="recMeta">${item.time}</div></div>`).join('')}</div>`;
+      historyBox.classList.remove('hidden');
+    }
+
+    function addHistory(label, subtitle = '') {
+      const raw = localStorage.getItem('milanoParcheggiHistory');
+      const history = raw ? JSON.parse(raw) : [];
+      history.unshift({
+        label,
+        subtitle,
+        time: new Date().toLocaleString('it-IT')
+      });
+      localStorage.setItem('milanoParcheggiHistory', JSON.stringify(history.slice(0, 20)));
+      renderHistoryBox();
+    }
+
     function clearHighlight() {
       if (highlightedLayer) {
         map.removeLayer(highlightedLayer);
         highlightedLayer = null;
       }
+      if (searchedRoadLayer) {
+        map.removeLayer(searchedRoadLayer);
+        searchedRoadLayer = null;
+      }
     }
 
-    function highlightFeature(feature) {
-      clearHighlight();
-      highlightedLayer = L.geoJSON(feature, {
-        style: {
-          color: '#ca8a04',
-          weight: 3,
-          fillColor: '#f59e0b',
-          fillOpacity: 0.18
-        }
-      }).addTo(map);
+    function clearSuggestedHighlight() {
+      if (suggestedLayer) {
+        map.removeLayer(suggestedLayer);
+        suggestedLayer = null;
+      }
     }
 
     function profileFromAmbito(ambito) {
@@ -481,6 +552,17 @@
       if (n >= 1 && n <= 7) return officialProfiles.areaC;
       if (n >= 8 && n <= 23) return officialProfiles.filo_11;
       return officialProfiles.extra_19;
+    }
+
+    function styleForFeature(feature) {
+      const profile = profileFromAmbito(feature.properties?.ambito);
+      if (profile?.group === 'Area C') {
+        return { color: '#dc2626', weight: 1, fillColor: '#dc2626', fillOpacity: 0.10 };
+      }
+      if (profile?.group === 'Cerchia filoviaria') {
+        return { color: '#2563eb', weight: 1, fillColor: '#2563eb', fillOpacity: 0.08 };
+      }
+      return { color: '#16a34a', weight: 1, fillColor: '#16a34a', fillOpacity: 0.08 };
     }
 
     function renderAtmBox(feature) {
@@ -499,9 +581,29 @@
           <div class="recMeta"><strong>Quando si paga:</strong> ${profile.quando}</div>
           <div class="recMeta">${profile.dettagli}</div>
           <div class="atmCodes"><strong>Codici ATM:</strong> ${profile.codes.join(', ')}</div>
+          <div class="actionRow">
+            <a class="actionLink btn-primary" target="_blank" rel="noopener" href="${googleMapsDirectionsUrlFromFeature(feature)}">Naviga qui</a>
+            <a class="actionLink" target="_blank" rel="noopener" href="${googleMapsSearchUrlFromFeature(feature)}">Apri su Maps</a>
+          </div>
         </div>
       `;
       atmBox.classList.remove('hidden');
+    }
+
+    function featureCenterLatLng(feature) {
+      const c = turf.centroid(feature);
+      return L.latLng(c.geometry.coordinates[1], c.geometry.coordinates[0]);
+    }
+
+    function googleMapsDirectionsUrlFromFeature(feature) {
+      const c = featureCenterLatLng(feature);
+      return `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`;
+    }
+
+    function googleMapsSearchUrlFromFeature(feature) {
+      const c = featureCenterLatLng(feature);
+      const label = encodeURIComponent(`${feature.properties?.nome || 'Ambito'} ${feature.properties?.ambito || ''}`);
+      return `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}%20(${label})`;
     }
 
     function setAmbitoResult(feature, extraText = '') {
@@ -517,14 +619,11 @@
       planBox.classList.remove('hidden');
       renderAtmBox(feature);
       highlightFeature(feature);
+      addHistory(props.nome || 'Ambito ATM', `Ambito ${props.ambito ?? '—'}`);
     }
 
     function centroidOfFeature(feature) {
-      try {
-        return turf.centroid(feature);
-      } catch (e) {
-        return null;
-      }
+      try { return turf.centroid(feature); } catch (e) { return null; }
     }
 
     function distanceBetweenFeaturesMeters(featureA, featureB) {
@@ -534,21 +633,8 @@
       return turf.distance(cA, cB, { units: 'kilometers' }) * 1000;
     }
 
-    function featureContainsLatLng(feature, latlng) {
-      const pt = turf.point([latlng.lng, latlng.lat]);
-      try {
-        return turf.booleanPointInPolygon(pt, feature);
-      } catch (e) {
-        return false;
-      }
-    }
-
     function featuresTouch(featureA, featureB) {
-      try {
-        return turf.booleanIntersects(featureA, featureB);
-      } catch (e) {
-        return false;
-      }
+      try { return turf.booleanIntersects(featureA, featureB); } catch (e) { return false; }
     }
 
     function getNearbyAmbiti(baseFeature, limit = 3) {
@@ -556,7 +642,7 @@
       const baseAmbito = String(baseFeature.properties?.ambito ?? '');
       const strategyMode = strategySelect.value;
 
-      const candidates = ambitiData.features
+      return ambitiData.features
         .filter(f => String(f.properties?.ambito ?? '') !== baseAmbito)
         .map(feature => {
           const dist = distanceBetweenFeaturesMeters(baseFeature, feature);
@@ -566,7 +652,6 @@
           let score = dist;
 
           if (touches) score -= 1500;
-          if (strategyMode === 'vicino') score += 0;
           if (strategyMode === 'equilibrato') {
             if (ambitoNum >= 1 && ambitoNum <= 7) score += 600;
             if (ambitoNum >= 24) score += 100;
@@ -577,28 +662,34 @@
             if (ambitoNum >= 24) score -= 400;
           }
 
-          return {
-            feature,
-            distance: dist,
-            touches,
-            score,
-            profile
-          };
+          return { feature, distance: dist, touches, score, profile };
         })
         .sort((a, b) => a.score - b.score)
         .slice(0, limit);
+    }
 
-      return candidates;
+    function renderSuggestedPolygons(items) {
+      clearSuggestedHighlight();
+      if (!items.length) return;
+      suggestedLayer = L.geoJSON({ type: 'FeatureCollection', features: items.map(i => i.feature) }, {
+        style: {
+          color: '#0ea5e9',
+          weight: 2,
+          fillColor: '#38bdf8',
+          fillOpacity: 0.08,
+          dashArray: '6,4'
+        }
+      }).addTo(map);
     }
 
     function renderNearbyAmbiti(baseFeature) {
-      const baseProps = baseFeature.properties || {};
       const nearby = getNearbyAmbiti(baseFeature, 3);
       if (!nearby.length) {
         hideRecommendations();
         return;
       }
 
+      renderSuggestedPolygons(nearby);
       recommendationsBox.innerHTML = '';
       const labels = ['Ambito vicino 1', 'Ambito vicino 2', 'Ambito vicino 3'];
       const strategyMode = strategySelect.value;
@@ -617,7 +708,11 @@
           </div>
           <div class="recMeta"><strong>Modalità attiva:</strong> ${strategyMode}</div>
           <div class="recMeta"><strong>Profilo stimato:</strong> ${item.profile ? item.profile.title : '—'}</div>
-          <div class="recMeta">Alternativa attorno all’ambito della destinazione, più utile di una zona lontana della città.</div>
+          <div class="recMeta">Alternativa attorno all’ambito della destinazione, molto più utile di una zona lontana della città.</div>
+          <div class="actionRow">
+            <a class="actionLink btn-primary" target="_blank" rel="noopener" href="${googleMapsDirectionsUrlFromFeature(item.feature)}">Naviga qui</a>
+            <a class="actionLink" target="_blank" rel="noopener" href="${googleMapsSearchUrlFromFeature(item.feature)}">Apri su Maps</a>
+          </div>
         `;
         card.addEventListener('click', () => {
           setAmbitoResult(item.feature, 'Ambito vicino selezionato dalla lista suggerimenti.');
@@ -636,11 +731,33 @@
       for (const feature of ambitiData.features) {
         try {
           if (turf.booleanPointInPolygon(pt, feature)) return feature;
-        } catch (e) {
-          // skip invalid geometry
-        }
+        } catch (e) {}
       }
       return null;
+    }
+
+    function highlightFeature(feature) {
+      clearHighlight();
+      highlightedLayer = L.geoJSON(feature, {
+        style: {
+          color: '#f59e0b',
+          weight: 3,
+          fillColor: '#fbbf24',
+          fillOpacity: 0.18
+        }
+      }).addTo(map);
+    }
+
+    function drawSearchBuffer(latlng) {
+      if (searchedRoadLayer) map.removeLayer(searchedRoadLayer);
+      searchedRoadLayer = L.circle(latlng, {
+        radius: 200,
+        color: '#7c3aed',
+        fillColor: '#8b5cf6',
+        fillOpacity: 0.05,
+        weight: 2,
+        dashArray: '4,4'
+      }).addTo(map);
     }
 
     async function loadAmbiti() {
@@ -650,12 +767,7 @@
         ambitiData = await response.json();
 
         ambitiLayer = L.geoJSON(ambitiData, {
-          style: {
-            color: '#2563eb',
-            weight: 1,
-            fillColor: '#2563eb',
-            fillOpacity: 0.06
-          },
+          style: feature => styleForFeature(feature),
           onEachFeature: (feature, layer) => {
             const props = feature.properties || {};
             layer.bindTooltip(`${props.nome || 'Ambito'} (${props.ambito || '—'})`);
@@ -673,7 +785,8 @@
         zoneText.textContent = 'Gli ambiti ufficiali sono stati caricati. Ora la ricerca usa il GeoJSON.';
         parkingType.textContent = 'GeoJSON';
         strategyText.textContent = strategySelect.value;
-        noticeBox.textContent = 'Puoi cercare un indirizzo o toccare direttamente un ambito.';
+        noticeBox.textContent = 'Puoi cercare un indirizzo o toccare direttamente un ambito. I colori indicano Area C, filoviaria, extra-filoviaria.';
+        renderHistoryBox();
       } catch (error) {
         zoneTitle.textContent = 'GeoJSON mancante';
         zoneBadge.textContent = 'errore';
@@ -728,12 +841,15 @@
           noticeBox.textContent = 'Prova con via + numero civico, ad esempio “Via Gomes 4”.';
           planBox.classList.add('hidden');
           clearHighlight();
+          clearSuggestedHighlight();
           hideRecommendations();
           hideAtmBox();
           return;
         }
 
         const latlng = L.latLng(parseFloat(result.lat), parseFloat(result.lon));
+        lastDestination = latlng;
+        addHistory('Ricerca indirizzo', result.display_name);
         map.setView(latlng, 16);
 
         if (destinationMarker) map.removeLayer(destinationMarker);
@@ -741,6 +857,7 @@
 
         destinationMarker = L.marker(latlng).addTo(map).bindPopup(result.display_name).openPopup();
         searchCircle = L.circle(latlng, { radius: 180, weight: 1, fillOpacity: 0.08 }).addTo(map);
+        drawSearchBuffer(latlng);
 
         const feature = findFeatureForLatLng(latlng);
         if (feature) {
@@ -756,6 +873,7 @@
           noticeBox.textContent = 'Ho trovato l’indirizzo, ma non sono riuscito ad associarlo a un poligono del GeoJSON.';
           planBox.classList.add('hidden');
           clearHighlight();
+          clearSuggestedHighlight();
           hideRecommendations();
           hideAtmBox();
         }
@@ -769,6 +887,7 @@
         noticeBox.textContent = 'Controlla la connessione o riprova tra poco.';
         planBox.classList.add('hidden');
         clearHighlight();
+        clearSuggestedHighlight();
         hideRecommendations();
         hideAtmBox();
       } finally {
@@ -779,6 +898,8 @@
 
     function handleGpsPosition(latlng, accuracy = 40) {
       map.setView(latlng, 15);
+      lastMyPosition = latlng;
+      addHistory('Posizione GPS', `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`);
 
       if (myMarker) map.removeLayer(myMarker);
       if (myCircle) map.removeLayer(myCircle);
@@ -800,6 +921,7 @@
         noticeBox.textContent = 'Ho rilevato la posizione ma non ho trovato un poligono corrispondente.';
         planBox.classList.add('hidden');
         clearHighlight();
+        clearSuggestedHighlight();
         hideRecommendations();
         hideAtmBox();
       }
@@ -818,6 +940,7 @@
         savedAt: new Date().toISOString()
       }));
       renderSavedCar();
+      addHistory('Auto salvata', `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`);
       showBanner('Posizione auto salvata sul dispositivo.');
     }
 
@@ -862,6 +985,7 @@
         noticeBox.textContent = 'La tua pagina deve essere servita in https oppure da localhost.';
         planBox.classList.add('hidden');
         clearHighlight();
+        clearSuggestedHighlight();
         hideRecommendations();
         hideAtmBox();
         return;
@@ -884,6 +1008,7 @@
           noticeBox.textContent = 'Controlla i permessi del browser.';
           planBox.classList.add('hidden');
           clearHighlight();
+          clearSuggestedHighlight();
           hideRecommendations();
           hideAtmBox();
         },
@@ -906,16 +1031,34 @@
     document.getElementById('fitZonesBtn').addEventListener('click', () => {
       map.fitBounds(cityBounds.pad(0.03));
       clearHighlight();
+      clearSuggestedHighlight();
       hideRecommendations();
     });
     document.getElementById('studyBtn').addEventListener('click', () => {
-      showBanner(`Modalità attiva: ${strategySelect.value}. Ora i suggerimenti sono ambiti vicini alla destinazione.`);
+      showBanner(`Modalità attiva: ${strategySelect.value}. Ora vedi ambito ufficiale, ambiti vicini, colori zona e navigazione rapida.`);
+    });
+
+    goToDestBtn.addEventListener('click', () => {
+      if (!lastDestination) {
+        showBanner('Non hai ancora una destinazione attiva.');
+        return;
+      }
+      map.setView(lastDestination, 16);
+    });
+
+    goToMeBtn.addEventListener('click', () => {
+      if (!lastMyPosition) {
+        showBanner('Non hai ancora una posizione GPS attiva.');
+        return;
+      }
+      map.setView(lastMyPosition, 16);
     });
 
     sheetToggleBtn.addEventListener('click', toggleSheet);
     sheetGrabber.addEventListener('click', toggleSheet);
 
     renderSavedCar();
+    renderHistoryBox();
     loadAmbiti();
   </script>
 </body>
