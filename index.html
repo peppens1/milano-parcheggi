@@ -450,6 +450,7 @@
     const goToMeBtn = document.getElementById('goToMeBtn');
 
     let ambitiData = null;
+    let ambitiMeta = {};
     let ambitiLayer = null;
     let myMarker = null;
     let myCircle = null;
@@ -568,19 +569,26 @@
     function renderAtmBox(feature) {
       const props = feature?.properties || {};
       const profile = profileFromAmbito(props.ambito);
-      if (!profile) {
+      const meta = ambitiMeta[String(props.ambito)] || null;
+      if (!profile && !meta) {
         hideAtmBox();
         return;
       }
 
+      const codice = meta?.codice || (profile ? profile.codes.join(', ') : 'non disponibile');
+      const tariffa = meta?.tariffa || profile?.tariffa || 'non disponibile';
+      const orari = meta?.orari || profile?.quando || 'non disponibili';
+      const note = meta?.note || profile?.dettagli || '';
+      const profiloLabel = meta?.profilo || profile?.title || 'non disponibile';
+
       atmBox.innerHTML = `
         <div class="atmCard">
           <strong>${props.nome || 'Ambito'} · ambito ${props.ambito ?? '—'}</strong>
-          <div class="recMeta"><strong>Profilo tariffario stimato:</strong> ${profile.title}</div>
-          <div class="recMeta"><strong>Tariffa:</strong> ${profile.tariffa}</div>
-          <div class="recMeta"><strong>Quando si paga:</strong> ${profile.quando}</div>
-          <div class="recMeta">${profile.dettagli}</div>
-          <div class="atmCodes"><strong>Codici ATM:</strong> ${profile.codes.join(', ')}</div>
+          <div class="recMeta"><strong>Profilo:</strong> ${profiloLabel}</div>
+          <div class="recMeta"><strong>Codice pagamento:</strong> ${codice}</div>
+          <div class="recMeta"><strong>Tariffa:</strong> ${tariffa}</div>
+          <div class="recMeta"><strong>Quando si paga:</strong> ${orari}</div>
+          <div class="recMeta">${note}</div>
           <div class="actionRow">
             <a class="actionLink btn-primary" target="_blank" rel="noopener" href="${googleMapsDirectionsUrlFromFeature(feature)}">Naviga qui</a>
             <a class="actionLink" target="_blank" rel="noopener" href="${googleMapsSearchUrlFromFeature(feature)}">Apri su Maps</a>
@@ -758,6 +766,16 @@
         weight: 2,
         dashArray: '4,4'
       }).addTo(map);
+    }
+
+    async function loadAmbitiMeta() {
+      try {
+        const response = await fetch('data/ambiti_meta.json');
+        if (!response.ok) throw new Error('meta');
+        ambitiMeta = await response.json();
+      } catch (error) {
+        ambitiMeta = {};
+      }
     }
 
     async function loadAmbiti() {
@@ -1059,7 +1077,7 @@
 
     renderSavedCar();
     renderHistoryBox();
-    loadAmbiti();
+    loadAmbitiMeta().then(() => loadAmbiti());
   </script>
 </body>
 </html>
