@@ -1,0 +1,19 @@
+{
+  "1": { "profilo": "areaC", "codice": "0123", "tariffa": "3 €/h", "orari": "08:00-19:00" },
+  "2": { "profilo": "areaC", "codice": "0223", "tariffa": "3 €/h", "orari": "08:00-19:00" },
+  "3": { "profilo": "areaC", "codice": "0323", "tariffa": "3 €/h", "orari": "08:00-19:00" },
+  "4": { "profilo": "areaC", "codice": "0423", "tariffa": "3 €/h", "orari": "08:00-19:00" },
+  "5": { "profilo": "areaC", "codice": "0523", "tariffa": "3 €/h", "orari": "08:00-19:00" },
+  "6": { "profilo": "areaC", "codice": "0623", "tariffa": "3 €/h", "orari": "08:00-19:00" },
+  "7": { "profilo": "areaC", "codice": "0723", "tariffa": "3 €/h", "orari": "08:00-19:00" },
+
+  "8": { "profilo": "filoviaria", "codice": "0811", "tariffa": "2 €/h", "orari": "08:00-19:00" },
+  "9": { "profilo": "filoviaria", "codice": "0911", "tariffa": "2 €/h", "orari": "08:00-19:00" },
+  "10": { "profilo": "filoviaria", "codice": "1011", "tariffa": "2 €/h", "orari": "08:00-19:00" },
+  "11": { "profilo": "filoviaria", "codice": "1111", "tariffa": "2 €/h", "orari": "08:00-19:00" },
+  "12": { "profilo": "filoviaria", "codice": "1211", "tariffa": "2 €/h", "orari": "08:00-19:00" },
+
+  "24": { "profilo": "extra", "codice": "2419", "tariffa": "1.20 €/h", "orari": "08:00-19:00" },
+  "25": { "profilo": "extra", "codice": "2519", "tariffa": "1.20 €/h", "orari": "08:00-19:00" },
+  "30": { "profilo": "extra", "codice": "3019", "tariffa": "1.20 €/h", "orari": "08:00-19:00" }
+}
