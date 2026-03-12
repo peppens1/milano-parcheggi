@@ -294,7 +294,7 @@
   <div class="topbar">
     <div>
       <div class="title">Milano Parcheggi · Ambiti ATM</div>
-      <div class="subtitle">Ricerca solo dentro Milano, ambito ufficiale da GeoJSON, 3 aree strategiche e pannello riducibile.</div>
+      <div class="subtitle">Ricerca solo dentro Milano, ambito ufficiale da GeoJSON, 3 ambiti vicini alla destinazione e pannello riducibile.</div>
     </div>
 
     <div class="searchRow">
@@ -395,15 +395,6 @@
       }
     };
 
-    const strategyAreas = [
-      { id: 'duomo', name: 'Duomo / Centro', parkingType: 'Area C', strategy: 'centro', color: '#2563eb', center: [45.4642, 9.1916], difficulty: 3, transitBonus: 2, plan: 'Molto vicino ma più stressante.' },
-      { id: 'cadorna', name: 'Cadorna / Castello', parkingType: 'Filoviaria', strategy: 'laterali utili', color: '#2563eb', center: [45.4700, 9.1795], difficulty: 2, transitBonus: 2, plan: 'Buon compromesso per il centro.' },
-      { id: 'centrale', name: 'Stazione Centrale', parkingType: 'Filoviaria', strategy: 'servono alternative', color: '#2563eb', center: [45.4855, 9.2044], difficulty: 3, transitBonus: 2, plan: 'Rotazione alta ma area densa.' },
-      { id: 'sansiro', name: 'San Siro / Lotto', parkingType: 'Extra-filoviaria', strategy: 'parcheggio + metro', color: '#16a34a', center: [45.4781, 9.1240], difficulty: 1, transitBonus: 3, plan: 'Ottima se preferisci meno stress.' },
-      { id: 'bicocca', name: 'Bicocca', parkingType: 'Extra-filoviaria', strategy: 'nord-est', color: '#16a34a', center: [45.5130, 9.2110], difficulty: 1, transitBonus: 3, plan: 'Comoda per approccio pratico.' },
-      { id: 'portaromana', name: 'Porta Romana', parkingType: 'Filoviaria', strategy: 'laterali', color: '#2563eb', center: [45.4528, 9.2020], difficulty: 2, transitBonus: 2, plan: 'Buon equilibrio tra accesso e stress.' }
-    ];
-
     const zoneTitle = document.getElementById('zoneTitle');
     const zoneBadge = document.getElementById('zoneBadge');
     const zoneText = document.getElementById('zoneText');
@@ -430,6 +421,7 @@
     let destinationMarker = null;
     let searchCircle = null;
     let savedCarMarker = null;
+    let highlightedLayer = null;
     let sheetCollapsed = false;
 
     function setSheetCollapsed(collapsed) {
@@ -462,6 +454,25 @@
     function hideAtmBox() {
       atmBox.innerHTML = '';
       atmBox.classList.add('hidden');
+    }
+
+    function clearHighlight() {
+      if (highlightedLayer) {
+        map.removeLayer(highlightedLayer);
+        highlightedLayer = null;
+      }
+    }
+
+    function highlightFeature(feature) {
+      clearHighlight();
+      highlightedLayer = L.geoJSON(feature, {
+        style: {
+          color: '#ca8a04',
+          weight: 3,
+          fillColor: '#f59e0b',
+          fillOpacity: 0.18
+        }
+      }).addTo(map);
     }
 
     function profileFromAmbito(ambito) {
@@ -502,67 +513,116 @@
       parkingType.textContent = props.ambito ?? '—';
       strategyText.textContent = strategySelect.value;
       noticeBox.textContent = extraText || 'Ora stai usando un ambito vero del GeoJSON ufficiale del Comune.';
-      planBox.innerHTML = `<strong>Come la userei io</strong>Usa questo ambito come riferimento principale, poi confronta le 3 aree strategiche qui sotto.`;
+      planBox.innerHTML = `<strong>Come la userei io</strong>Usa questo ambito come riferimento principale, poi confronta gli ambiti vicini qui sotto.`;
       planBox.classList.remove('hidden');
       renderAtmBox(feature);
+      highlightFeature(feature);
     }
 
-    function getRecommendationScore(area, distance, mode) {
-      const difficultyPenalty = area.difficulty || 2;
-      const transitBonus = area.transitBonus || 2;
-      if (mode === 'vicino') return distance + difficultyPenalty * 240 - transitBonus * 35;
-      if (mode === 'facile') return distance * 0.65 + difficultyPenalty * 520 - transitBonus * 180;
-      return distance * 0.85 + difficultyPenalty * 320 - transitBonus * 110;
+    function centroidOfFeature(feature) {
+      try {
+        return turf.centroid(feature);
+      } catch (e) {
+        return null;
+      }
     }
 
-    function getTopRecommendations(latlng, limit = 3) {
-      const mode = strategySelect.value;
-      return strategyAreas
-        .map(area => {
-          const distance = map.distance(latlng, L.latLng(area.center[0], area.center[1]));
-          return { area, distance, score: getRecommendationScore(area, distance, mode) };
+    function distanceBetweenFeaturesMeters(featureA, featureB) {
+      const cA = centroidOfFeature(featureA);
+      const cB = centroidOfFeature(featureB);
+      if (!cA || !cB) return Infinity;
+      return turf.distance(cA, cB, { units: 'kilometers' }) * 1000;
+    }
+
+    function featureContainsLatLng(feature, latlng) {
+      const pt = turf.point([latlng.lng, latlng.lat]);
+      try {
+        return turf.booleanPointInPolygon(pt, feature);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function featuresTouch(featureA, featureB) {
+      try {
+        return turf.booleanIntersects(featureA, featureB);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function getNearbyAmbiti(baseFeature, limit = 3) {
+      if (!ambitiData || !baseFeature) return [];
+      const baseAmbito = String(baseFeature.properties?.ambito ?? '');
+      const strategyMode = strategySelect.value;
+
+      const candidates = ambitiData.features
+        .filter(f => String(f.properties?.ambito ?? '') !== baseAmbito)
+        .map(feature => {
+          const dist = distanceBetweenFeaturesMeters(baseFeature, feature);
+          const touches = featuresTouch(baseFeature, feature);
+          const ambitoNum = Number(feature.properties?.ambito ?? 999);
+          const profile = profileFromAmbito(ambitoNum);
+          let score = dist;
+
+          if (touches) score -= 1500;
+          if (strategyMode === 'vicino') score += 0;
+          if (strategyMode === 'equilibrato') {
+            if (ambitoNum >= 1 && ambitoNum <= 7) score += 600;
+            if (ambitoNum >= 24) score += 100;
+          }
+          if (strategyMode === 'facile') {
+            if (ambitoNum >= 1 && ambitoNum <= 7) score += 1800;
+            if (ambitoNum >= 8 && ambitoNum <= 23) score += 500;
+            if (ambitoNum >= 24) score -= 400;
+          }
+
+          return {
+            feature,
+            distance: dist,
+            touches,
+            score,
+            profile
+          };
         })
         .sort((a, b) => a.score - b.score)
         .slice(0, limit);
+
+      return candidates;
     }
 
-    function renderRecommendations(items, destinationLatLng) {
-      if (!items || !items.length) {
+    function renderNearbyAmbiti(baseFeature) {
+      const baseProps = baseFeature.properties || {};
+      const nearby = getNearbyAmbiti(baseFeature, 3);
+      if (!nearby.length) {
         hideRecommendations();
         return;
       }
 
       recommendationsBox.innerHTML = '';
-      const labels = ['Prima scelta', 'Alternativa', 'Piano B'];
+      const labels = ['Ambito vicino 1', 'Ambito vicino 2', 'Ambito vicino 3'];
       const strategyMode = strategySelect.value;
 
-      items.forEach((item, index) => {
+      nearby.forEach((item, index) => {
+        const props = item.feature.properties || {};
         const card = document.createElement('div');
         card.className = 'recCard';
         card.innerHTML = `
           <div class="recTop">
             <div>
-              <div class="recTitle">${item.area.name}</div>
-              <div class="recMeta">${item.area.parkingType} · ${Math.round(item.distance)} m dalla destinazione</div>
+              <div class="recTitle">${props.nome || 'Ambito'} (${props.ambito ?? '—'})</div>
+              <div class="recMeta">${item.touches ? 'Confinante' : 'Vicino'} · ${Math.round(item.distance)} m dal centro dell’ambito destinazione</div>
             </div>
             <span class="recTag">${labels[index]}</span>
           </div>
-          <div class="recMeta"><strong>Strategia zona:</strong> ${item.area.strategy}</div>
           <div class="recMeta"><strong>Modalità attiva:</strong> ${strategyMode}</div>
-          <div class="recMeta">${item.area.plan}</div>
+          <div class="recMeta"><strong>Profilo stimato:</strong> ${item.profile ? item.profile.title : '—'}</div>
+          <div class="recMeta">Alternativa attorno all’ambito della destinazione, più utile di una zona lontana della città.</div>
         `;
         card.addEventListener('click', () => {
-          zoneTitle.textContent = item.area.name;
-          zoneBadge.textContent = 'strategica';
-          zoneBadge.className = 'pill pill-green';
-          zoneText.textContent = item.area.plan;
-          parkingType.textContent = item.area.parkingType;
-          strategyText.textContent = item.area.strategy;
-          noticeBox.textContent = 'Questa è una delle 3 aree strategiche suggerite vicino alla destinazione.';
-          const bounds = L.latLngBounds([]);
-          bounds.extend(destinationLatLng);
-          bounds.extend(item.area.center);
-          map.fitBounds(bounds.pad(0.25));
+          setAmbitoResult(item.feature, 'Ambito vicino selezionato dalla lista suggerimenti.');
+          const layer = L.geoJSON(item.feature);
+          map.fitBounds(layer.getBounds().pad(0.15));
         });
         recommendationsBox.appendChild(card);
       });
@@ -601,7 +661,7 @@
             layer.bindTooltip(`${props.nome || 'Ambito'} (${props.ambito || '—'})`);
             layer.on('click', () => {
               setAmbitoResult(feature, 'Ambito selezionato direttamente dalla mappa.');
-              hideRecommendations();
+              renderNearbyAmbiti(feature);
               map.fitBounds(layer.getBounds().pad(0.15));
             });
           }
@@ -667,6 +727,7 @@
           strategyText.textContent = strategySelect.value;
           noticeBox.textContent = 'Prova con via + numero civico, ad esempio “Via Gomes 4”.';
           planBox.classList.add('hidden');
+          clearHighlight();
           hideRecommendations();
           hideAtmBox();
           return;
@@ -684,6 +745,7 @@
         const feature = findFeatureForLatLng(latlng);
         if (feature) {
           setAmbitoResult(feature, 'Indirizzo trovato dentro Milano e agganciato all’ambito ufficiale.');
+          renderNearbyAmbiti(feature);
         } else {
           zoneTitle.textContent = 'Destinazione trovata';
           zoneBadge.textContent = 'fuori ambito';
@@ -693,10 +755,10 @@
           strategyText.textContent = strategySelect.value;
           noticeBox.textContent = 'Ho trovato l’indirizzo, ma non sono riuscito ad associarlo a un poligono del GeoJSON.';
           planBox.classList.add('hidden');
+          clearHighlight();
+          hideRecommendations();
           hideAtmBox();
         }
-
-        renderRecommendations(getTopRecommendations(latlng, 3), latlng);
       } catch (error) {
         zoneTitle.textContent = 'Ricerca temporaneamente non disponibile';
         zoneBadge.textContent = 'errore';
@@ -706,6 +768,7 @@
         strategyText.textContent = strategySelect.value;
         noticeBox.textContent = 'Controlla la connessione o riprova tra poco.';
         planBox.classList.add('hidden');
+        clearHighlight();
         hideRecommendations();
         hideAtmBox();
       } finally {
@@ -726,6 +789,7 @@
       const feature = findFeatureForLatLng(latlng);
       if (feature) {
         setAmbitoResult(feature, 'Posizione attuale agganciata all’ambito ufficiale.');
+        renderNearbyAmbiti(feature);
       } else {
         zoneTitle.textContent = 'Posizione rilevata';
         zoneBadge.textContent = 'GPS';
@@ -735,10 +799,10 @@
         strategyText.textContent = strategySelect.value;
         noticeBox.textContent = 'Ho rilevato la posizione ma non ho trovato un poligono corrispondente.';
         planBox.classList.add('hidden');
+        clearHighlight();
+        hideRecommendations();
         hideAtmBox();
       }
-
-      renderRecommendations(getTopRecommendations(latlng, 3), latlng);
     }
 
     function saveCar() {
@@ -797,6 +861,7 @@
         strategyText.textContent = strategySelect.value;
         noticeBox.textContent = 'La tua pagina deve essere servita in https oppure da localhost.';
         planBox.classList.add('hidden');
+        clearHighlight();
         hideRecommendations();
         hideAtmBox();
         return;
@@ -818,6 +883,7 @@
           strategyText.textContent = strategySelect.value;
           noticeBox.textContent = 'Controlla i permessi del browser.';
           planBox.classList.add('hidden');
+          clearHighlight();
           hideRecommendations();
           hideAtmBox();
         },
@@ -826,9 +892,12 @@
     });
 
     strategySelect.addEventListener('change', () => {
-      const latlng = destinationMarker ? destinationMarker.getLatLng() : (myMarker ? myMarker.getLatLng() : null);
-      if (!latlng) return;
-      renderRecommendations(getTopRecommendations(latlng, 3), latlng);
+      const sourceLatLng = destinationMarker ? destinationMarker.getLatLng() : (myMarker ? myMarker.getLatLng() : null);
+      if (!sourceLatLng) return;
+      const feature = findFeatureForLatLng(sourceLatLng);
+      if (feature) {
+        renderNearbyAmbiti(feature);
+      }
       showBanner(`Strategia aggiornata: ${strategySelect.value}.`);
     });
 
@@ -836,10 +905,11 @@
     document.getElementById('goToCarBtn').addEventListener('click', goToCar);
     document.getElementById('fitZonesBtn').addEventListener('click', () => {
       map.fitBounds(cityBounds.pad(0.03));
+      clearHighlight();
       hideRecommendations();
     });
     document.getElementById('studyBtn').addEventListener('click', () => {
-      showBanner(`Modalità attiva: ${strategySelect.value}. Usa ambito ufficiale e 3 aree strategiche per decidere dove provare.`);
+      showBanner(`Modalità attiva: ${strategySelect.value}. Ora i suggerimenti sono ambiti vicini alla destinazione.`);
     });
 
     sheetToggleBtn.addEventListener('click', toggleSheet);
